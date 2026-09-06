@@ -69,20 +69,21 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-behavior: smooth;
-    /* A scroll container clips at its border box, which would shear the glow
-       off any tile against a screen edge. The padding has to be at least as
-       wide as the effect reaches: the glow extends about 23px past the tile,
-       the drop shadow about 30px below it, and scale(1.07) adds roughly 14px
-       more on a 4-column 1080p grid. 52px covers all of it.
+    /* A scroll container clips at its border box, which shears the glow off
+       any tile near an edge. Sideways this is solved structurally rather than
+       by guessing at the blur radius: the padding is exactly the safe-area
+       margin and the negative margin cancels it, so the container runs the
+       full width of the screen and its clip edge is the screen edge, where
+       nothing can be seen. Tiles keep their positions either way.
 
-       The negative margin pulls the container back out so tiles keep the
-       positions they had before the padding existed. Sideways it cancels the
-       padding completely, since the safe-area margin has room to spare.
-       Vertically it only reclaims the row gap, because going further would
-       run the grid into the clock and the footer. */
-    padding: 52px;
-    margin: -20px -52px;
-    scroll-padding: 52px 0;
+       Vertically it cannot go full bleed without the glow washing over the
+       clock and the footer, so the padding is a measured 64px. Chromium's
+       blur reaches noticeably further than the nominal blur/2, and
+       scale(1.07) magnifies the shadow along with the tile, so the earlier
+       52px was not enough. */
+    padding: 64px var(--safe-x);
+    margin: -3vh calc(-1 * var(--safe-x));
+    scroll-padding: 64px 0;
     scrollbar-width: none;
   }
   #grid::-webkit-scrollbar { display: none; }
@@ -117,8 +118,8 @@
     transform: scale(1.07);
     z-index: 2;
     box-shadow:
-      0 0 70px -12px var(--tint),
-      0 24px 48px -18px rgba(0, 0, 0, 0.9);
+      0 0 56px -12px var(--tint),
+      0 20px 40px -16px rgba(0, 0, 0, 0.9);
   }
 
   /* ---- footer ---- */
