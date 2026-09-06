@@ -43,10 +43,14 @@ COMMON_FLAGS = [
     "--autoplay-policy=no-user-gesture-required",
     "--check-for-update-interval=31536000",
     "--password-store=basic",
-    # Service pages render their own scrollbars, which look wrong on a TV and
-    # cannot be reached without a pointer. Content still scrolls; only the bar
-    # is hidden.
-    "--hide-scrollbars",
+    # Chromium's component updater downloads its own Widevine CDM into each
+    # profile and prefers it over the system one from libwidevinecdm0. On this
+    # Pi the downloaded build fails Netflix playback with E100 while the
+    # packaged build plays fine. The download lands silently mid-session and
+    # only takes effect on the next launch, so playback that worked keeps
+    # working until the window is reopened, which makes it read as a
+    # service-side problem rather than a local one.
+    "--disable-component-update",
 ]
 
 _proc: subprocess.Popen | None = None
