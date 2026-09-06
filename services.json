@@ -68,8 +68,8 @@
     "id": "youtube",
     "name": "YouTube",
     "url": "https://www.youtube.com/tv",
-    "color": "#FF0033",
-    "ink": "#FFFFFF",
+    "color": "#FFFFFF",
+    "ink": "#0F0F0F",
     "note": "Uses the TV interface, which is built for a d-pad. Best remote experience here."
   },
   {
