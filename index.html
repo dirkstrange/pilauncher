@@ -16,6 +16,18 @@
     --safe-x: 4.5vw;
     --safe-y: 4vh;
     --gap: 1.6vw;
+
+    /* How far an unfocused tile recedes. 1 is no change at all; the effect
+       started at 0.5 brightness, which turned the light tiles grey. Kept as
+       variables so the strength is one place to adjust. */
+    --dim-brightness: 0.9;
+    --dim-saturate: 0.92;
+    --dim-opacity: 0.9;
+    /* Stronger while a tile is being moved, since that is a modal state and
+       wants to read differently from ordinary focus. */
+    --arrange-brightness: 0.62;
+    --arrange-saturate: 0.5;
+    --arrange-opacity: 0.55;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,7 +131,7 @@
        They were one value, which meant a red Netflix wordmark sat on a red
        tile and vanished the moment it lit up. */
     background: var(--surface, var(--tint));
-    filter: saturate(0.18) brightness(0.5);
+    filter: saturate(var(--dim-saturate)) brightness(var(--dim-brightness));
     transition: filter 140ms ease;
   }
   .tile > * {
@@ -132,7 +144,7 @@
      still recognisably its own colour. */
   .tile .label,
   .tile .logo {
-    opacity: 0.62;
+    opacity: var(--dim-opacity);
     transition: opacity 140ms ease;
   }
   .tile.focused .label,
@@ -195,9 +207,11 @@
 
   /* Everything else recedes while a move is in progress, background first so
      the logos do not go grey. */
-  #grid.arranging .tile:not(.moving)::before { filter: saturate(0.1) brightness(0.3); }
+  #grid.arranging .tile:not(.moving)::before {
+    filter: saturate(var(--arrange-saturate)) brightness(var(--arrange-brightness));
+  }
   #grid.arranging .tile:not(.moving) .label,
-  #grid.arranging .tile:not(.moving) .logo { opacity: 0.4; }
+  #grid.arranging .tile:not(.moving) .logo { opacity: var(--arrange-opacity); }
 
   @media (prefers-reduced-motion: reduce) {
     .tile.moving { transform: none; }
