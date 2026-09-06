@@ -12,6 +12,10 @@ Environment overrides:
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
     PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
     PILAUNCHER_ORDER      saved tile order (default: alongside the profiles)
+    PILAUNCHER_WALLPAPERS screensaver image folder
+    PILAUNCHER_NASA_KEY   api.nasa.gov key, to lift the shared DEMO_KEY limit
+    PILAUNCHER_WALLPAPER_FEEDS  bing,apod,nasa-library,epic (default bing,apod)
+    PILAUNCHER_NASA_QUERY search terms for the nasa-library feed
     PILAUNCHER_LOGOS      directory of service logo images
 """
 
@@ -19,10 +23,15 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import shutil
 import signal
 import subprocess
 import threading
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -44,6 +53,24 @@ ORDER_FILE = Path(os.environ.get("PILAUNCHER_ORDER", PROFILE_ROOT.parent / "orde
 # Logos are fetched per machine rather than committed. They are trademarked
 # brand assets, and a repo that ships them is redistributing them.
 LOGO_DIR = Path(os.environ.get("PILAUNCHER_LOGOS", PROFILE_ROOT.parent / "logos"))
+# Screensaver imagery. A local folder is the dependable source: it needs no
+# network, no API key, and cannot be rate limited or discontinued. NASA's
+# picture-of-the-day feed is the fallback so the feature works out of the box.
+WALLPAPER_DIR = Path(os.environ.get("PILAUNCHER_WALLPAPERS", PROFILE_ROOT.parent / "screensaver"))
+WALLPAPER_CACHE = WALLPAPER_DIR / ".remote-cache.json"
+NASA_KEY = os.environ.get("PILAUNCHER_NASA_KEY", "DEMO_KEY")
+CACHE_MAX_AGE = 22 * 60 * 60      # a day's worth, well inside DEMO_KEY limits
+# Which feeds to draw from, in order. Everything here works without an API key
+# of your own; NASA_KEY only raises the shared DEMO_KEY rate limit.
+WALLPAPER_FEEDS = [
+    f.strip() for f in
+    os.environ.get("PILAUNCHER_WALLPAPER_FEEDS", "bing,apod").split(",")
+    if f.strip()
+]
+# Search terms for the nasa-library feed, which takes a query rather than
+# returning a fixed set.
+NASA_QUERY = os.environ.get("PILAUNCHER_NASA_QUERY", "nebula galaxy")
+
 LOGO_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
@@ -99,6 +126,136 @@ def load_services() -> list[dict]:
     # saved keeps its relative position and lands at the end rather than
     # vanishing or jumping to the front.
     return sorted(services, key=lambda s: rank.get(s.get("id"), len(rank)))
+
+
+def local_wallpapers() -> list[str]:
+    if not WALLPAPER_DIR.is_dir():
+        return []
+    names = [
+        p.name for p in sorted(WALLPAPER_DIR.iterdir())
+        if p.is_file() and p.suffix.lower() in LOGO_TYPES and not p.name.startswith(".")
+    ]
+    return ["/wallpaper/" + n for n in names]
+
+
+def _get_json(url: str):
+    req = urllib.request.Request(url, headers={"User-Agent": "pilauncher"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read())
+
+
+def feed_apod() -> list[str]:
+    """NASA picture of the day. Space, curated, one request per batch."""
+    data = _get_json(
+        "https://api.nasa.gov/planetary/apod"
+        "?api_key=" + NASA_KEY + "&count=25&thumbs=true"
+    )
+    out = []
+    for e in data if isinstance(data, list) else []:
+        if e.get("media_type") == "image":
+            link = e.get("hdurl") or e.get("url")
+            if link and link.startswith("https://"):
+                out.append(link)
+    return out
+
+
+def feed_bing() -> list[str]:
+    """Bing's daily wallpaper. Landscape and nature photography, no key."""
+    data = _get_json(
+        "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US"
+    )
+    out = []
+    for img in data.get("images", []) if isinstance(data, dict) else []:
+        path = img.get("url") or ""
+        if not path:
+            continue
+        # The feed hands back a 1920x1080 crop; the UHD variant is the same
+        # asset at full resolution and costs nothing extra to request.
+        path = path.replace("_1920x1080.jpg", "_UHD.jpg")
+        out.append("https://www.bing.com" + path)
+    return out
+
+
+def feed_nasa_library() -> list[str]:
+    """NASA's image archive. No key at all, and searchable."""
+    query = urllib.parse.quote(NASA_QUERY)
+    data = _get_json(
+        "https://images-api.nasa.gov/search?q=" + query +
+        "&media_type=image&page_size=40"
+    )
+    out = []
+    items = (data.get("collection", {}) or {}).get("items", []) if isinstance(data, dict) else []
+    for item in items:
+        for link in item.get("links", []) or []:
+            href = link.get("href", "")
+            # Listings return a thumbnail; the large rendition sits beside it
+            # under the same asset name.
+            if href.endswith("~thumb.jpg"):
+                out.append(href.replace("~thumb.jpg", "~large.jpg"))
+                break
+    return out
+
+
+def feed_epic() -> list[str]:
+    """Live full-disc Earth from DSCOVR. Striking, but visually repetitive."""
+    data = _get_json("https://api.nasa.gov/EPIC/api/natural?api_key=" + NASA_KEY)
+    out = []
+    for e in data if isinstance(data, list) else []:
+        image, date = e.get("image"), e.get("date", "")[:10].replace("-", "/")
+        if image and date:
+            out.append(
+                "https://api.nasa.gov/EPIC/archive/natural/" + date +
+                "/png/" + image + ".png?api_key=" + NASA_KEY
+            )
+    return out
+
+
+FEED_FUNCS = {
+    "apod": feed_apod,
+    "bing": feed_bing,
+    "nasa-library": feed_nasa_library,
+    "epic": feed_epic,
+}
+
+
+def remote_wallpapers() -> list[str]:
+    """Image URLs from the configured feeds, cached to disk for a day.
+
+    Batched deliberately: a slideshow changing every half minute would exhaust
+    a shared API key within the hour, while one request per feed per day does
+    not come close. A stale cache is preferred over an empty screen when the
+    network is down.
+    """
+    try:
+        cached = json.loads(WALLPAPER_CACHE.read_text(encoding="utf-8"))
+        fresh = time.time() - cached.get("fetched", 0) < CACHE_MAX_AGE
+        if fresh and cached.get("urls"):
+            return cached["urls"]
+    except (OSError, json.JSONDecodeError, TypeError):
+        cached = {}
+
+    urls: list[str] = []
+    for name in WALLPAPER_FEEDS:
+        func = FEED_FUNCS.get(name)
+        if func is None:
+            continue
+        try:
+            urls.extend(func())
+        except Exception:
+            # One dead feed should not take the others down with it.
+            continue
+
+    if not urls:
+        return cached.get("urls", []) if isinstance(cached, dict) else []
+
+    try:
+        WALLPAPER_DIR.mkdir(parents=True, exist_ok=True)
+        WALLPAPER_CACHE.write_text(
+            json.dumps({"fetched": time.time(), "urls": urls}), encoding="utf-8"
+        )
+    except OSError:
+        pass
+    return urls
 
 
 def with_logos(services: list[dict]) -> list[dict]:
@@ -273,6 +430,31 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, target.read_bytes(), ctype)
             except OSError:
                 self._json(500, {"error": "could not read logo"})
+        elif path == "/wallpapers":
+            local = local_wallpapers()
+            # Local images win outright. Someone who put pictures in the folder
+            # wants those, not whatever the feed happens to be serving.
+            urls = local if local else remote_wallpapers()
+            random.shuffle(urls)
+            self._json(200, {
+                "urls": urls,
+                "source": "local" if local else ",".join(WALLPAPER_FEEDS),
+            })
+        elif path.startswith("/wallpaper/"):
+            name = path[len("/wallpaper/"):]
+            target = (WALLPAPER_DIR / name).resolve()
+            try:
+                inside = target.is_relative_to(WALLPAPER_DIR.resolve())
+            except (OSError, ValueError):
+                inside = False
+            ctype = LOGO_TYPES.get(target.suffix.lower())
+            if not inside or ctype is None or not target.is_file():
+                self._json(404, {"error": "no such wallpaper"})
+                return
+            try:
+                self._send(200, target.read_bytes(), ctype)
+            except OSError:
+                self._json(500, {"error": "could not read wallpaper"})
         elif path == "/status":
             self._json(200, {"running": service_running()})
         else:

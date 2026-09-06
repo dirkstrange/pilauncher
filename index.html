@@ -246,6 +246,68 @@
     margin-right: 0.45em;
   }
 
+  /* ---- screensaver ---- */
+  #saver {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 900ms ease;
+  }
+  #saver.on {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #saver .frame {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+  #saver .frame.show { opacity: 1; }
+  /* Slow drift, so a static photo does not sit burning into an OLED panel and
+     the screen has some life to it from across the room. */
+  #saver.on .frame.show { animation: drift 40s ease-in-out infinite alternate; }
+  @keyframes drift {
+    from { transform: scale(1.06) translate(0, 0); }
+    to   { transform: scale(1.14) translate(-1.5%, -1%); }
+  }
+  #saver .veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.7), rgba(0,0,0,0) 42%);
+  }
+  #saver .time {
+    position: absolute;
+    left: var(--safe-x);
+    bottom: var(--safe-y);
+    font-size: clamp(44px, 6vw, 120px);
+    font-variation-settings: "wdth" 74, "wght" 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #FFFFFF;
+    text-shadow: 0 4px 40px rgba(0, 0, 0, 0.7);
+  }
+  #saver .caption {
+    position: absolute;
+    right: var(--safe-x);
+    bottom: var(--safe-y);
+    max-width: 40ch;
+    text-align: right;
+    font-size: clamp(12px, 1vw, 20px);
+    color: rgba(255, 255, 255, 0.62);
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #saver.on .frame.show { animation: none; }
+  }
+
   #fault {
     font-size: clamp(13px, 1.05vw, 21px);
     color: #FF7A6B;
@@ -275,6 +337,14 @@
       <span><b>Hold OK</b>rearrange</span>
     </div>
   </footer>
+</div>
+
+<div id="saver" aria-hidden="true">
+  <div class="frame" id="frameA"></div>
+  <div class="frame" id="frameB"></div>
+  <div class="veil"></div>
+  <div class="time" id="saverTime"></div>
+  <div class="caption" id="saverCaption"></div>
 </div>
 
 <script>
@@ -593,6 +663,109 @@
     dragFrom = null;
     if (moving >= 0) drop(true);
   });
+
+  /* ---------- screensaver ---------- */
+
+  const IDLE_MS = 30 * 1000;        // TEMPORARY: 30s for testing, 10 * 60 * 1000 normally
+  const SLIDE_MS = 30 * 1000;       // how long each picture holds
+
+  const saver = document.getElementById("saver");
+  const frames = [document.getElementById("frameA"), document.getElementById("frameB")];
+  const saverTime = document.getElementById("saverTime");
+  const saverCaption = document.getElementById("saverCaption");
+
+  let idleTimer = null;
+  let slideTimer = null;
+  let shots = [];
+  let shot = 0;
+  let frameOn = 0;
+  let saverOn = false;
+
+  function paintTime() {
+    saverTime.textContent = new Date().toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true
+    });
+  }
+
+  function nextShot() {
+    if (!shots.length) return;
+    const url = shots[shot % shots.length];
+    shot += 1;
+    const incoming = frames[frameOn ^ 1];
+    const outgoing = frames[frameOn];
+    // Decode first so the crossfade never reveals a half-painted image.
+    const pre = new Image();
+    pre.onload = () => {
+      incoming.style.backgroundImage = 'url("' + url + '")';
+      incoming.classList.add("show");
+      outgoing.classList.remove("show");
+      frameOn ^= 1;
+      paintTime();
+    };
+    pre.onerror = () => {
+      // A dead link just moves the queue along rather than stalling it.
+      shots = shots.filter(u => u !== url);
+      if (shots.length) nextShot();
+    };
+    pre.src = url;
+  }
+
+  function startSaver() {
+    if (saverOn || moving >= 0) return;
+    fetch("/wallpapers")
+      .then(r => r.json())
+      .then(data => {
+        shots = (data && data.urls) || [];
+        if (!shots.length) return;      // nothing to show, stay on the tiles
+        saverOn = true;
+        saver.classList.add("on");
+        saver.setAttribute("aria-hidden", "false");
+        saverCaption.textContent = data.source === "local"
+          ? "" : "Imagery from " + data.source;
+        paintTime();
+        nextShot();
+        slideTimer = setInterval(nextShot, SLIDE_MS);
+      })
+      .catch(() => {});
+  }
+
+  function stopSaver() {
+    if (!saverOn) return;
+    saverOn = false;
+    saver.classList.remove("on");
+    saver.setAttribute("aria-hidden", "true");
+    clearInterval(slideTimer);
+    slideTimer = null;
+    frames.forEach(f => f.classList.remove("show"));
+  }
+
+  function poke() {
+    clearTimeout(idleTimer);
+    // Only idles on the tile screen. With a service open the launcher is
+    // covered anyway, and waking to a screensaver behind Netflix would be a
+    // surprise.
+    idleTimer = setTimeout(() => {
+      fetch("/status")
+        .then(r => r.json())
+        .then(s => { if (!s.running) startSaver(); })
+        .catch(() => startSaver());
+    }, IDLE_MS);
+  }
+
+  // Any input dismisses it. The event that woke the screen is swallowed, so
+  // the keypress that ends the screensaver does not also open a service.
+  ["keydown", "mousemove", "mousedown", "wheel"].forEach(evt => {
+    document.addEventListener(evt, e => {
+      if (saverOn) {
+        stopSaver();
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+      poke();
+    }, true);
+  });
+  setInterval(() => { if (saverOn) paintTime(); }, 15000);
+  poke();
 
   // Reveal the cursor only once a pointing device is actually used, so an
   // air mouse works without leaving a stray arrow on screen the rest of the time.
