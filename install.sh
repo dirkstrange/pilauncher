@@ -105,46 +105,7 @@ if grep -q 'pilauncher:end' "$LABWC_DIR/rc.xml" && grep -q 'desktop.sh' "$LABWC_
   ok "keybinds already current"
 else
   cp "$LABWC_DIR/rc.xml" "$LABWC_DIR/rc.xml.bak.$(date +%Y%m%d%H%M%S)"
-  python3 - "$LABWC_DIR/rc.xml" "$HERE" <<'PYEOF'
-import io, re, sys
-path, here = sys.argv[1], sys.argv[2]
-text = io.open(path, encoding='utf-8').read()
-
-# Drop any previous block so a re-run picks up keybinds added since.
-text = re.sub(r'[ 	]*<!-- pilauncher:begin -->.*?<!-- pilauncher:end -->
-',
-              '', text, flags=re.S)
-
-# labwc does not expand ~ in Execute commands, so these paths are absolute.
-block = f"""    <!-- pilauncher:begin -->
-    <!-- Kiosk windows swallow keystrokes, so a way back has to be bound at the
-         compositor rather than in the page. A-F4 is a backstop that does not
-         depend on the launcher daemon being healthy. C-A-d drops to the Pi
-         desktop and brings the launcher back again. -->
-    <keybind key="A-Escape">
-      <action name="Execute" command="{here}/back.sh" />
-    </keybind>
-    <keybind key="XF86HomePage">
-      <action name="Execute" command="{here}/back.sh" />
-    </keybind>
-    <keybind key="A-F4">
-      <action name="Close" />
-    </keybind>
-    <keybind key="C-A-d">
-      <action name="Execute" command="{here}/desktop.sh" />
-    </keybind>
-    <!-- pilauncher:end -->
-"""
-marker = '<keyboard>
-'
-if marker not in text:
-    sys.exit('no <keyboard> section in rc.xml; add the keybinds by hand')
-idx = text.index(marker) + len(marker)
-io.open(path, 'w', encoding='utf-8', newline='
-').write(text[:idx] + block + text[idx:])
-PYEOF
-  python3 -c "import xml.etree.ElementTree as ET,sys; ET.parse(sys.argv[1])" "$LABWC_DIR/rc.xml" \
-    || die "rc.xml is not well-formed after edit; restore the .bak beside it"
+  python3 "$HERE/scripts/labwc_keybinds.py" "$LABWC_DIR/rc.xml" "$HERE" || die "could not add keybinds; the .bak beside rc.xml is your original"
   ok "keybinds added (Alt+Escape, Home, Alt+F4, Ctrl+Alt+D)"
 fi
 
@@ -171,6 +132,25 @@ fi
 if pgrep -x labwc >/dev/null; then
   kill -HUP "$(pgrep -x labwc | head -1)" 2>/dev/null && ok "labwc config reloaded"
 fi
+
+# ------------------------------------------------------- desktop shortcut
+say "Adding the desktop shortcut"
+
+# Exiting the launcher drops to the Pi desktop, so there has to be something
+# there to start it again without a terminal.
+APPS="$HOME/.local/share/applications"
+mkdir -p "$APPS"
+cp "$HERE/pilauncher.desktop" "$APPS/pilauncher.desktop"
+ok "menu entry at $APPS/pilauncher.desktop"
+
+DESKTOP_DIR="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")"
+if [ -d "$DESKTOP_DIR" ]; then
+  cp "$HERE/pilauncher.desktop" "$DESKTOP_DIR/pilauncher.desktop"
+  chmod +x "$DESKTOP_DIR/pilauncher.desktop"
+  ok "desktop icon in $DESKTOP_DIR"
+fi
+
+update-desktop-database "$APPS" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------- start up
 say "Starting services"
@@ -199,5 +179,7 @@ cat <<EOM
     No restart needed; the daemon rereads it per request.
 
     Alt+Escape returns to the tiles from inside a service window.
-    Ctrl+Alt+D drops to the Pi desktop, and brings the launcher back.
+    To leave the launcher: pick "Exit to Desktop" from the last tile, or
+    press Ctrl+Alt+D. To come back: the Media Launcher icon on the Pi
+    desktop, or Ctrl+Alt+D again.
 EOM

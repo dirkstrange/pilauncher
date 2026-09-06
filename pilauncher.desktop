@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Media Launcher
+GenericName=Streaming launcher
+Comment=Open the streaming service launcher full screen
+Exec=systemctl --user start pilauncher-shell.service
+Icon=video-television
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=tv;streaming;netflix;kiosk;

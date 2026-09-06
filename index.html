@@ -185,6 +185,17 @@
   let tiles = [];
   let cursor = 0;
 
+  // Not part of services.json. Appended to the grid so there is a way out of
+  // the launcher using only the arrow keys a remote sends.
+  const EXIT_TILE = {
+    id: "__desktop__",
+    name: "Exit to Desktop",
+    color: "#39405A",
+    ink: "#DDE3F2",
+    note: "Closes the launcher and shows the Raspberry Pi desktop. " +
+          "Reopen it from the Media Launcher icon there, or press Ctrl+Alt+D."
+  };
+
   /* ---------- clock ---------- */
   function tick() {
     const now = new Date();
@@ -229,9 +240,9 @@
   }
 
   function build(list) {
-    services = list;
+    services = list.concat([EXIT_TILE]);
     grid.textContent = "";
-    tiles = list.map((svc, i) => {
+    tiles = services.map((svc, i) => {
       const btn = document.createElement("button");
       btn.className = "tile";
       btn.style.setProperty("--tint", svc.color || "#2A3040");
@@ -264,6 +275,20 @@
   function open() {
     const svc = services[cursor];
     if (!svc || busy) return;
+
+    if (svc.id === EXIT_TILE.id) {
+      busy = true;
+      post("/desktop")
+        .then(res => {
+          if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
+        })
+        .catch(() => {
+          // Expected on success: the window this page runs in is being closed.
+        })
+        .finally(() => { setTimeout(() => { busy = false; }, 800); });
+      return;
+    }
+
     busy = true;
     post("/launch", { id: svc.id })
       .then(res => {

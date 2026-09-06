@@ -9,6 +9,7 @@ Environment overrides:
     PILAUNCHER_BROWSER    browser binary          (default: chromium)
     PILAUNCHER_PROFILES   profile root directory
     PILAUNCHER_PORT       listen port             (default: 8800)
+    PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ PROFILE_ROOT = Path(
 )
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
+SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
 
 # Flags applied to every service window. Kiosk gives a bare fullscreen surface;
 # the rest suppress the dialogs and bubbles that would otherwise appear on a TV
@@ -114,6 +116,25 @@ def start_service(svc: dict) -> int:
     return proc.pid
 
 
+def stop_shell() -> bool:
+    """Stop the launcher's own Chromium window, revealing the Pi desktop.
+
+    The daemon keeps running. It holds no display state and costs nothing
+    idle, and leaving it up means the desktop shortcut only has to start the
+    shell again rather than the whole stack.
+    """
+    stop_current()
+    try:
+        subprocess.run(
+            ["systemctl", "--user", "stop", SHELL_UNIT],
+            check=True,
+            timeout=15,
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def service_running() -> bool:
     with _lock:
         return _proc is not None and _proc.poll() is None
@@ -179,6 +200,11 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"launched": svc["id"], "pid": pid})
         elif path == "/close":
             self._json(200, {"closed": stop_current()})
+        elif path == "/desktop":
+            if stop_shell():
+                self._json(200, {"desktop": True})
+            else:
+                self._json(500, {"error": f"could not stop {SHELL_UNIT}"})
         else:
             self._json(404, {"error": "not found"})
 
