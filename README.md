@@ -1,40 +1,54 @@
 # pilauncher
 
-A 10-foot launcher for Raspberry Pi OS. Tiles open streaming services as
-fullscreen Chromium kiosk windows, each with its own browser profile.
+Turns a Raspberry Pi into a TV streaming box. You get a grid of tiles for
+Netflix, Prime Video, Jellyfin and whatever else you add, navigable with arrow
+keys from across the room. Picking one opens that service full screen in
+Chromium with no browser chrome, so it behaves like an app rather than a web
+page.
 
-Tested target: Raspberry Pi 5, Raspberry Pi OS (64-bit), labwc compositor.
+The Pi has no official app for most streaming services, so this runs their web
+players instead. Read "Known ceilings" at the bottom before you build one.
+Netflix tops out around 720p here and Apple TV barely works, and neither of
+those is fixable from this end.
 
-## What it is
+## What you need
+
+- A Raspberry Pi 5 running Raspberry Pi OS (64-bit) with the desktop, which
+  uses the labwc compositor. Older releases shipped Wayfire or X11 and the
+  keyboard setup differs; see "The back button".
+- A keyboard, at least for setup. Any remote that sends arrow keys and Enter
+  works afterwards, including most HDMI-CEC TV remotes and air mice.
+- Accounts for whichever services you plan to use. This launches their web
+  players; it does not bypass anything or provide content of its own.
+
+## How it fits together
 
 - `launcher.py` runs a small HTTP server on `127.0.0.1:8800`. It serves the
-  tile UI and spawns one Chromium process per service.
-- `index.html` is the UI. Arrow keys move, Enter opens, Escape closes.
-- `services.json` is the catalog. Edit it; nothing else hardcodes services.
-- `back.sh` closes the active service window. Bind it to a compositor hotkey.
+  tile page and starts a Chromium window when you pick something.
+- `index.html` is that page. Arrow keys move, Enter opens, Escape closes.
+- `services.json` is the catalog of services. Edit it to add or remove tiles;
+  nothing else in the code knows what Netflix is.
+- `back.sh` closes whatever service is open. It gets bound to a hotkey.
 
-Each service gets its own `--user-data-dir`, so logins do not collide and a
-crash in one player cannot take the rest down. Profiles live under
-`~/.local/share/pilauncher/profiles/`.
+The server binds to localhost, so nothing outside the Pi can reach it.
+
+Each service runs with its own `--user-data-dir`, which means separate cookies
+and logins per service, and a player that crashes cannot take the others with
+it. Those profiles live under `~/.local/share/pilauncher/profiles/`.
 
 ## Install
 
 ```bash
-git clone <this repo> ~/pilauncher
+git clone https://github.com/dirkstrange/pilauncher.git ~/pilauncher
 cd ~/pilauncher
 ./install.sh
 ```
 
-`install.sh` does everything the rest of this document describes: installs the
-packages, checks for the Widevine CDM, writes and enables both systemd units,
-enables linger, adds the compositor keybinds without clobbering the Pi OS
-defaults, stops the screen blanking, and waits for the daemon to answer before
-reporting how many tiles it serves. It is safe to re-run, which is also how you
-apply changes to the units after a `git pull`.
+`install.sh` does everything the rest of this document describes by hand. It is
+safe to re-run, which is how you apply unit changes after a `git pull`.
 
-The rest of this document explains what it does and why, which is worth reading
-if something goes wrong or you are adapting this to a different compositor. To
-do it by hand instead:
+The sections below cover what it sets up and why. They matter when something
+breaks, or when you are adapting this to another compositor. To install by hand:
 
 ```bash
 sudo apt update
@@ -98,8 +112,9 @@ RestartSec=2
 WantedBy=default.target
 ```
 
-The two `Environment` lines are not optional, and the reason is worth knowing
-because the failure looks like a launcher bug rather than an environment one.
+The two `Environment` lines are not optional, and leaving them out fails in a
+way that points at the launcher instead of the environment.
+
 The compositor imports `WAYLAND_DISPLAY` into the systemd user environment
 shortly after it starts, and a unit ordered `After=graphical-session.target`
 can still start before that import lands. When it does, the daemon inherits no
@@ -134,17 +149,16 @@ RestartSec=3
 WantedBy=default.target
 ```
 
-`--password-store=basic` matters more than it looks. It mirrors the flag the
-daemon already passes to every service window. Leave it off and Chromium asks
-the Secret Service for an encryption key; with autologin the login keyring is
-never unlocked, because no password is typed at login for PAM to hand along, so
-the TV shows an "Unlock Keyring" dialog on every boot. The shell holds no
-credentials of its own, it only renders tiles.
+`--password-store=basic` mirrors the flag the daemon passes to every service
+window. Leave it off and Chromium asks the Secret Service for an encryption
+key. With autologin nothing ever unlocks the login keyring, since no password
+is typed at login for PAM to hand along, so an "Unlock Keyring" dialog lands on
+the TV at every boot. The shell stores no credentials. It only draws tiles.
 
-The shell unit waits for the daemon to answer rather than sleeping a fixed
-three seconds. A blind sleep happened to work here, but only because it pushed
-the shell past the environment import by luck; the daemon starting at the same
-instant is what broke.
+The shell unit waits for the daemon to answer instead of sleeping a fixed three
+seconds. A fixed sleep did work here, but only by accident: it pushed the shell
+past the environment import. The daemon, starting at the same instant, is what
+broke.
 
 ```bash
 systemctl --user daemon-reload
@@ -158,11 +172,10 @@ Kiosk windows swallow keystrokes, so the page cannot catch a "go home" key
 once a service is open. Bind it at the compositor instead.
 
 For labwc the binding goes in `~/.config/labwc/rc.xml` inside `<keyboard>`.
-That file usually does not exist yet, and this is the part that catches people:
-a user `rc.xml` replaces the system defaults outright rather than layering on
-top of them. Writing a file containing only these two keybinds costs you
-Alt-Tab, the volume keys, and every other stock binding. Start from the system
-copy instead:
+That file usually does not exist yet. A user `rc.xml` replaces the system
+defaults outright rather than layering on top of them, so a file containing
+only these two keybinds costs you Alt-Tab, the volume keys, and every other
+stock binding. Start from the system copy:
 
 ```bash
 cp /etc/xdg/labwc/rc.xml ~/.config/labwc/rc.xml
@@ -181,7 +194,7 @@ not necessarily `pi`:
 </keybind>
 ```
 
-Worth binding a second way out as well. `back.sh` talks to the launcher daemon,
+Bind a second way out as well. `back.sh` talks to the launcher daemon,
 so if that daemon ever wedges there is no keyboard route out of a fullscreen
 kiosk window. A plain window close does not depend on it:
 
@@ -213,8 +226,9 @@ apply.
 
 ```bash
 sudo apt install -y wlopm
-# labwc autostart file: ~/.config/labwc/autostart
-wlopm --on '*'
+# A user autostart replaces the system one, so seed it before appending.
+cp /etc/xdg/labwc/autostart ~/.config/labwc/autostart
+echo "wlopm --on '*'" >> ~/.config/labwc/autostart
 ```
 
 Also disable the desktop screensaver in `raspi-config` under Display Options.
