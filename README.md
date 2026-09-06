@@ -135,6 +135,20 @@ not necessarily `pi`:
 </keybind>
 ```
 
+Worth binding a second way out as well. `back.sh` talks to the launcher daemon,
+so if that daemon ever wedges there is no keyboard route out of a fullscreen
+kiosk window. A plain window close does not depend on it:
+
+```xml
+<keybind key="A-F4">
+  <action name="Close" />
+</keybind>
+```
+
+Neither labwc's defaults nor the Raspberry Pi OS config bind a close action, so
+without this Alt+Escape is the only exit. Closing the launcher shell by mistake
+is harmless, since systemd restarts it within a few seconds.
+
 Reload with `labwc --reconfigure`. That command reads `LABWC_PID` from its own
 session, so it fails over SSH; from a remote shell send the signal directly
 with `kill -HUP $(pgrep -x labwc)`. Confirm your compositor first:
