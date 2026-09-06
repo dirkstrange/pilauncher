@@ -1,0 +1,20 @@
+[Unit]
+Description=pilauncher daemon
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+# The compositor imports WAYLAND_DISPLAY into the systemd user environment a
+# moment after it starts, and this unit can win that race. Without these the
+# daemon inherits no display, every Chromium it spawns picks the X11 backend
+# and exits with "Missing X server or $DISPLAY", and /launch still returns 200
+# with a pid that is already dead.
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_SESSION_TYPE=wayland
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && exit 0; sleep 1; done; echo "wayland socket never appeared" >&2; exit 1'
+ExecStart=/usr/bin/python3 __PILAUNCHER_DIR__/launcher.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
