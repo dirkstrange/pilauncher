@@ -12,6 +12,7 @@ Environment overrides:
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
     PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
     PILAUNCHER_ORDER      saved tile order (default: alongside the profiles)
+    PILAUNCHER_LOGOS      directory of service logo images
 """
 
 from __future__ import annotations
@@ -40,6 +41,16 @@ CDM_SEED = Path(os.environ.get("PILAUNCHER_CDM_SEED", PROFILE_ROOT.parent / "wid
 # Tile order lives outside the repo. services.json is the catalog and is
 # tracked in git; rewriting it from the UI would conflict with every pull.
 ORDER_FILE = Path(os.environ.get("PILAUNCHER_ORDER", PROFILE_ROOT.parent / "order.json"))
+# Logos are fetched per machine rather than committed. They are trademarked
+# brand assets, and a repo that ships them is redistributing them.
+LOGO_DIR = Path(os.environ.get("PILAUNCHER_LOGOS", PROFILE_ROOT.parent / "logos"))
+LOGO_TYPES = {
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+}
 
 # Flags applied to every service window. Kiosk gives a bare fullscreen surface;
 # the rest suppress the dialogs and bubbles that would otherwise appear on a TV
@@ -88,6 +99,23 @@ def load_services() -> list[dict]:
     # saved keeps its relative position and lands at the end rather than
     # vanishing or jumping to the front.
     return sorted(services, key=lambda s: rank.get(s.get("id"), len(rank)))
+
+
+def with_logos(services: list[dict]) -> list[dict]:
+    """Attach a logo URL to any service that has an image on disk.
+
+    Detected rather than declared, so dropping netflix.png into the logo
+    directory is all it takes; services.json stays free of local file paths.
+    """
+    out = []
+    for svc in services:
+        svc = dict(svc)
+        for ext in LOGO_TYPES:
+            if (LOGO_DIR / (svc.get("id", "") + ext)).is_file():
+                svc["logo"] = "/logos/" + svc["id"] + ext
+                break
+        out.append(svc)
+    return out
 
 
 def save_order(ids: list[str]) -> None:
@@ -226,8 +254,25 @@ class Handler(BaseHTTPRequestHandler):
             # Hidden entries stay in the catalog but off the screen. They are
             # still launchable by id, so a service can be parked without
             # losing its colours and notes.
-            visible = [s for s in load_services() if not s.get("hidden")]
+            visible = with_logos([s for s in load_services() if not s.get("hidden")])
             self._send(200, json.dumps(visible).encode(), "application/json")
+        elif path.startswith("/logos/"):
+            name = path[len("/logos/"):]
+            # Resolve and confirm the result is still inside LOGO_DIR, so a
+            # crafted path cannot read arbitrary files off the box.
+            target = (LOGO_DIR / name).resolve()
+            try:
+                inside = target.is_relative_to(LOGO_DIR.resolve())
+            except (OSError, ValueError):
+                inside = False
+            ctype = LOGO_TYPES.get(target.suffix.lower())
+            if not inside or ctype is None or not target.is_file():
+                self._json(404, {"error": "no such logo"})
+                return
+            try:
+                self._send(200, target.read_bytes(), ctype)
+            except OSError:
+                self._json(500, {"error": "could not read logo"})
         elif path == "/status":
             self._json(200, {"running": service_running()})
         else:
