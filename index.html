@@ -69,12 +69,20 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     scroll-behavior: smooth;
-    /* Focused tiles scale up and cast a glow; the padding keeps both off the
-       clipping edge, and the scroll padding stops a focused tile from landing
-       flush against the top or bottom while scrolling. */
-    padding: 1.4vh 1.2vw;
-    margin: -1.4vh -1.2vw;
-    scroll-padding: 3vh 0;
+    /* A scroll container clips at its border box, which would shear the glow
+       off any tile against a screen edge. The padding has to be at least as
+       wide as the effect reaches: the glow extends about 23px past the tile,
+       the drop shadow about 30px below it, and scale(1.07) adds roughly 14px
+       more on a 4-column 1080p grid. 52px covers all of it.
+
+       The negative margin pulls the container back out so tiles keep the
+       positions they had before the padding existed. Sideways it cancels the
+       padding completely, since the safe-area margin has room to spare.
+       Vertically it only reclaims the row gap, because going further would
+       run the grid into the clock and the footer. */
+    padding: 52px;
+    margin: -20px -52px;
+    scroll-padding: 52px 0;
     scrollbar-width: none;
   }
   #grid::-webkit-scrollbar { display: none; }
