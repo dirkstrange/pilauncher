@@ -5,7 +5,8 @@
     "url": "https://www.netflix.com/browse",
     "color": "#E50914",
     "ink": "#FFFFFF",
-    "note": "Works with libwidevinecdm0. Capped at SD-to-720p on Widevine L3."
+    "note": "Works with libwidevinecdm0. Capped at SD-to-720p on Widevine L3.",
+    "tile_bg": "#121212"
   },
   {
     "id": "prime",
@@ -13,7 +14,8 @@
     "url": "https://www.primevideo.com",
     "color": "#00A8E1",
     "ink": "#04202B",
-    "note": "Reliable on Linux Chromium. L3 resolution cap applies."
+    "note": "Reliable on Linux Chromium. L3 resolution cap applies.",
+    "tile_bg": "#0F171E"
   },
   {
     "id": "disneyplus",
@@ -21,7 +23,8 @@
     "url": "https://www.disneyplus.com",
     "color": "#113CCF",
     "ink": "#FFFFFF",
-    "note": "Inconsistent on L3. Some titles refuse to start playback."
+    "note": "Inconsistent on L3. Some titles refuse to start playback.",
+    "tile_bg": "#FFFFFF"
   },
   {
     "id": "max",
@@ -29,7 +32,8 @@
     "url": "https://play.max.com",
     "color": "#002BE7",
     "ink": "#FFFFFF",
-    "note": "Player is heavy. Expect slow catalog scrolling on the Pi."
+    "note": "Player is heavy. Expect slow catalog scrolling on the Pi.",
+    "tile_bg": "#FFFFFF"
   },
   {
     "id": "hulu",
@@ -38,7 +42,8 @@
     "color": "#1CE783",
     "ink": "#062916",
     "note": "Blocks Linux browsers. Sends a Windows Chrome user_agent so the player loads.",
-    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+    "tile_bg": "#07160F"
   },
   {
     "id": "paramount",
@@ -46,7 +51,8 @@
     "url": "https://www.paramountplus.com",
     "color": "#0064FF",
     "ink": "#FFFFFF",
-    "note": "Generally loads on Linux. Live TV feeds are the flaky part."
+    "note": "Generally loads on Linux. Live TV feeds are the flaky part.",
+    "tile_bg": "#0A1633"
   },
   {
     "id": "peacock",
@@ -62,15 +68,17 @@
     "url": "https://tv.apple.com",
     "color": "#E8E8ED",
     "ink": "#16161A",
-    "note": "Web player prefers Safari. Playback on Linux is unreliable."
+    "note": "Web player prefers Safari. Playback on Linux is unreliable.",
+    "tile_bg": "#F4F4F6"
   },
   {
     "id": "youtube",
     "name": "YouTube",
     "url": "https://www.youtube.com/tv",
-    "color": "#FFFFFF",
+    "color": "#FF0033",
     "ink": "#0F0F0F",
-    "note": "Uses the TV interface, which is built for a d-pad. Best remote experience here."
+    "note": "Uses the TV interface, which is built for a d-pad. Best remote experience here.",
+    "tile_bg": "#FFFFFF"
   },
   {
     "id": "plex",
@@ -95,7 +103,8 @@
     "url": "https://tubitv.com",
     "color": "#6C1CD1",
     "ink": "#FFFFFF",
-    "note": "Free and ad-supported. Light DRM, works well on Linux."
+    "note": "Free and ad-supported. Light DRM, works well on Linux.",
+    "tile_bg": "#150826"
   },
   {
     "id": "pluto",
@@ -103,7 +112,8 @@
     "url": "https://pluto.tv",
     "color": "#FFF200",
     "ink": "#232000",
-    "note": "Free live channels. One of the more forgiving players on the Pi."
+    "note": "Free live channels. One of the more forgiving players on the Pi.",
+    "tile_bg": "#F3F3F3"
   },
   {
     "id": "crunchyroll",
@@ -119,7 +129,8 @@
     "url": "https://www.twitch.tv",
     "color": "#9146FF",
     "ink": "#FFFFFF",
-    "note": "No DRM. Full resolution available, limited only by CPU decode."
+    "note": "No DRM. Full resolution available, limited only by CPU decode.",
+    "tile_bg": "#0E0B16"
   },
   {
     "id": "spotify",

@@ -115,7 +115,10 @@
     inset: 0;
     z-index: 0;
     border-radius: inherit;
-    background: var(--tint);
+    /* --surface is the tile face, --tint stays the brand colour for the glow.
+       They were one value, which meant a red Netflix wordmark sat on a red
+       tile and vanished the moment it lit up. */
+    background: var(--surface, var(--tint));
     filter: saturate(0.18) brightness(0.5);
     transition: filter 140ms ease;
   }
@@ -431,6 +434,7 @@
       btn.className = "tile";
       btn.style.setProperty("--tint", svc.color || "#2A3040");
       btn.style.setProperty("--tint-ink", svc.ink || "#FFFFFF");
+      if (svc.tile_bg) btn.style.setProperty("--surface", svc.tile_bg);
       btn.setAttribute("role", "option");
 
       const label = document.createElement("span");
