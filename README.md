@@ -106,7 +106,7 @@ PartOf=graphical-session.target
 Environment=WAYLAND_DISPLAY=wayland-0
 Environment=XDG_SESSION_TYPE=wayland
 ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8800/status && exit 0; sleep 1; done; echo "daemon never came up" >&2; exit 1'
-ExecStart=/usr/bin/chromium --kiosk --noerrdialogs \
+ExecStart=/usr/bin/chromium --kiosk --noerrdialogs --password-store=basic \
   --disable-infobars --disable-session-crashed-bubble \
   --user-data-dir=%h/.local/share/pilauncher/shell \
   http://127.0.0.1:8800
@@ -116,6 +116,13 @@ RestartSec=3
 [Install]
 WantedBy=default.target
 ```
+
+`--password-store=basic` matters more than it looks. It mirrors the flag the
+daemon already passes to every service window. Leave it off and Chromium asks
+the Secret Service for an encryption key; with autologin the login keyring is
+never unlocked, because no password is typed at login for PAM to hand along, so
+the TV shows an "Unlock Keyring" dialog on every boot. The shell holds no
+credentials of its own, it only renders tiles.
 
 The shell unit waits for the daemon to answer rather than sleeping a fixed
 three seconds. A blind sleep happened to work here, but only because it pushed
