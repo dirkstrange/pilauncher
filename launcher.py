@@ -53,6 +53,11 @@ COMMON_FLAGS = [
     # cannot be grabbed without a pointer. Scrolling still works; only the bar
     # is hidden.
     "--hide-scrollbars",
+    # Streaming sites are built for a pointer, so arrow keys do nothing on most
+    # of their menus. This moves focus between clickable elements instead,
+    # which is as close to d-pad navigation as a plain web app gets. It applies
+    # to service windows only; the launcher's own page handles arrows itself.
+    "--enable-spatial-navigation",
 ]
 
 _proc: subprocess.Popen | None = None
