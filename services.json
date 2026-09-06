@@ -60,7 +60,8 @@
     "url": "https://www.peacocktv.com/watch/home",
     "color": "#7A4DF5",
     "ink": "#FFFFFF",
-    "note": "Loads on Linux. Heavy player, slow on first launch."
+    "note": "Loads on Linux. Heavy player, slow on first launch.",
+    "tile_bg": "#FFFFFF"
   },
   {
     "id": "appletv",
@@ -95,7 +96,8 @@
     "url": "http://192.168.1.10:30013",
     "color": "#AA5CC3",
     "ink": "#FFFFFF",
-    "note": "Local Jellyfin server. No DRM, so no resolution cap."
+    "note": "Local Jellyfin server. No DRM, so no resolution cap.",
+    "tile_bg": "#101725"
   },
   {
     "id": "tubi",
@@ -104,7 +106,7 @@
     "color": "#6C1CD1",
     "ink": "#FFFFFF",
     "note": "Free and ad-supported. Light DRM, works well on Linux.",
-    "tile_bg": "#150826"
+    "tile_bg": "#F4EFFF"
   },
   {
     "id": "pluto",
@@ -121,7 +123,8 @@
     "url": "https://www.crunchyroll.com",
     "color": "#F47521",
     "ink": "#2B1102",
-    "note": "Works on Linux. Subtitle rendering is CPU-light."
+    "note": "Works on Linux. Subtitle rendering is CPU-light.",
+    "tile_bg": "#FFFFFF"
   },
   {
     "id": "twitch",
@@ -138,6 +141,7 @@
     "url": "https://open.spotify.com",
     "color": "#1DB954",
     "ink": "#04250F",
-    "note": "Audio only, so no decode load. Good background option."
+    "note": "Audio only, so no decode load. Good background option.",
+    "tile_bg": "#FFFFFF"
   }
 ]
