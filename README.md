@@ -253,10 +253,14 @@ keybinds do not reach.
 
 ```bash
 sudo apt install -y wlopm
-# A user autostart replaces the system one, so seed it before appending.
-cp /etc/xdg/labwc/autostart ~/.config/labwc/autostart
 echo "wlopm --on '*'" >> ~/.config/labwc/autostart
 ```
+
+Raspberry Pi OS starts labwc with `--merge-config`, which makes a user
+`autostart` run in addition to `/etc/xdg/labwc/autostart` rather than instead
+of it. Put only your own additions in the user file. Copying the system entries
+into it starts `pcmanfm-pi`, `wf-panel-pi` and `kanshi` a second time, and two
+stacked taskbars on the desktop is what that looks like.
 
 Also disable the desktop screensaver in `raspi-config` under Display Options.
 
@@ -301,7 +305,10 @@ not a default you inherited.
 - The Pi 5 has no hardware H.264 decoder. Browser DRM streams fall to CPU
   decode. At 720p this is fine; there is not much headroom above it.
 - The `plex` entry is hidden and still points at a placeholder host.
-- Everything in `~/.config/labwc/` replaces its system counterpart rather than
-  merging with it. That goes for `autostart` as well as `rc.xml`, so seed from
-  `/etc/xdg/labwc/` before adding anything.
+- Whether files in `~/.config/labwc/` merge with the system copies or replace
+  them depends on how labwc was started. Raspberry Pi OS passes
+  `--merge-config`, so they merge and a user file should hold additions only.
+  Without that flag the first file found wins and the user file needs the
+  system contents seeded into it. Check which you have with
+  `tr ' ' ' ' < /proc/$(pgrep -x labwc)/cmdline`.
 - Apple TV's web player is built around Safari and is unreliable here.
