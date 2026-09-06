@@ -20,8 +20,25 @@ crash in one player cannot take the rest down. Profiles live under
 ## Install
 
 ```bash
+git clone <this repo> ~/pilauncher
+cd ~/pilauncher
+./install.sh
+```
+
+`install.sh` does everything the rest of this document describes: installs the
+packages, checks for the Widevine CDM, writes and enables both systemd units,
+enables linger, adds the compositor keybinds without clobbering the Pi OS
+defaults, stops the screen blanking, and waits for the daemon to answer before
+reporting how many tiles it serves. It is safe to re-run, which is also how you
+apply changes to the units after a `git pull`.
+
+The rest of this document explains what it does and why, which is worth reading
+if something goes wrong or you are adapting this to a different compositor. To
+do it by hand instead:
+
+```bash
 sudo apt update
-sudo apt install -y chromium libwidevinecdm0 curl
+sudo apt install -y chromium libwidevinecdm0 curl wlopm
 mkdir -p ~/pilauncher
 # copy launcher.py, index.html, services.json, back.sh into ~/pilauncher
 chmod +x ~/pilauncher/launcher.py ~/pilauncher/back.sh
@@ -243,4 +260,7 @@ not a default you inherited.
 - The Pi 5 has no hardware H.264 decoder. Browser DRM streams fall to CPU
   decode. At 720p this is fine; there is not much headroom above it.
 - The `plex` entry is hidden and still points at a placeholder host.
+- Everything in `~/.config/labwc/` replaces its system counterpart rather than
+  merging with it. That goes for `autostart` as well as `rc.xml`, so seed from
+  `/etc/xdg/labwc/` before adding anything.
 - Apple TV's web player is built around Safari and is unreliable here.
