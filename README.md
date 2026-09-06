@@ -345,5 +345,5 @@ not a default you inherited.
   `--merge-config`, so they merge and a user file should hold additions only.
   Without that flag the first file found wins and the user file needs the
   system contents seeded into it. Check which you have with
-  `tr ' ' ' ' < /proc/$(pgrep -x labwc)/cmdline`.
+  `tr '\0' ' ' < /proc/$(pgrep -x labwc)/cmdline`.
 - Apple TV's web player is built around Safari and is unreliable here.
