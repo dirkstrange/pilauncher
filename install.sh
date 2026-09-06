@@ -99,20 +99,28 @@ if [ ! -f "$LABWC_DIR/rc.xml" ]; then
   fi
 fi
 
-if grep -q 'pilauncher' "$LABWC_DIR/rc.xml"; then
-  ok "keybinds already present"
+# The block is delimited so a re-run can replace it wholesale. Checking only
+# for presence would leave an older install without keybinds added later.
+if grep -q 'pilauncher:end' "$LABWC_DIR/rc.xml" && grep -q 'desktop.sh' "$LABWC_DIR/rc.xml"; then
+  ok "keybinds already current"
 else
   cp "$LABWC_DIR/rc.xml" "$LABWC_DIR/rc.xml.bak.$(date +%Y%m%d%H%M%S)"
-  python3 - "$LABWC_DIR/rc.xml" "$HERE" <<'PY'
-import io, sys
+  python3 - "$LABWC_DIR/rc.xml" "$HERE" <<'PYEOF'
+import io, re, sys
 path, here = sys.argv[1], sys.argv[2]
 text = io.open(path, encoding='utf-8').read()
-# labwc does not expand ~ in Execute commands, so the path is absolute.
-block = f'''
-    <!-- pilauncher: close the active service window and return to the tiles.
-         Kiosk windows swallow keystrokes, so this is bound at the compositor
-         rather than in the page. A-F4 is a backstop that does not depend on
-         the launcher daemon being healthy. -->
+
+# Drop any previous block so a re-run picks up keybinds added since.
+text = re.sub(r'[ 	]*<!-- pilauncher:begin -->.*?<!-- pilauncher:end -->
+',
+              '', text, flags=re.S)
+
+# labwc does not expand ~ in Execute commands, so these paths are absolute.
+block = f"""    <!-- pilauncher:begin -->
+    <!-- Kiosk windows swallow keystrokes, so a way back has to be bound at the
+         compositor rather than in the page. A-F4 is a backstop that does not
+         depend on the launcher daemon being healthy. C-A-d drops to the Pi
+         desktop and brings the launcher back again. -->
     <keybind key="A-Escape">
       <action name="Execute" command="{here}/back.sh" />
     </keybind>
@@ -122,16 +130,22 @@ block = f'''
     <keybind key="A-F4">
       <action name="Close" />
     </keybind>
-'''
-marker = '<keyboard>\n'
+    <keybind key="C-A-d">
+      <action name="Execute" command="{here}/desktop.sh" />
+    </keybind>
+    <!-- pilauncher:end -->
+"""
+marker = '<keyboard>
+'
 if marker not in text:
     sys.exit('no <keyboard> section in rc.xml; add the keybinds by hand')
 idx = text.index(marker) + len(marker)
-io.open(path, 'w', encoding='utf-8', newline='\n').write(text[:idx] + block + text[idx:])
-PY
+io.open(path, 'w', encoding='utf-8', newline='
+').write(text[:idx] + block + text[idx:])
+PYEOF
   python3 -c "import xml.etree.ElementTree as ET,sys; ET.parse(sys.argv[1])" "$LABWC_DIR/rc.xml" \
     || die "rc.xml is not well-formed after edit; restore the .bak beside it"
-  ok "keybinds added (Alt+Escape, Home, Alt+F4)"
+  ok "keybinds added (Alt+Escape, Home, Alt+F4, Ctrl+Alt+D)"
 fi
 
 # Stop the display blanking mid-film. autostart follows the same XDG lookup as
@@ -161,7 +175,7 @@ fi
 # ---------------------------------------------------------------- start up
 say "Starting services"
 
-chmod +x "$HERE/launcher.py" "$HERE/back.sh" 2>/dev/null || true
+chmod +x "$HERE/launcher.py" "$HERE/back.sh" "$HERE/desktop.sh" 2>/dev/null || true
 systemctl --user enable --now pilauncher.service pilauncher-shell.service
 
 for i in $(seq 1 30); do
@@ -185,4 +199,5 @@ cat <<EOM
     No restart needed; the daemon rereads it per request.
 
     Alt+Escape returns to the tiles from inside a service window.
+    Ctrl+Alt+D drops to the Pi desktop, and brings the launcher back.
 EOM
