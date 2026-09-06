@@ -9,3 +9,12 @@ __pycache__/
 .local/
 profiles/
 shell/
+
+# Service logos are trademarked brand assets and are fetched per machine into
+# ~/.local/share/pilauncher/logos, never committed. This catches one dropped
+# into the repo root by mistake on its way to the Pi.
+*.svg
+*.png
+*.webp
+*.jpg
+*.jpeg
