@@ -122,6 +122,30 @@
       0 20px 40px -16px rgba(0, 0, 0, 0.9);
   }
 
+  /* A tile that has been picked up. Lifted further than a focused tile and
+     tilted slightly, so it is obvious the next arrow press moves it rather
+     than the cursor. */
+  .tile.moving {
+    filter: none;
+    z-index: 3;
+    transform: scale(1.12) rotate(-1.4deg);
+    box-shadow:
+      0 0 80px -10px var(--tint),
+      0 32px 64px -20px rgba(0, 0, 0, 0.95);
+    cursor: grabbing;
+  }
+  .tile.moving .label::after {
+    content: " \2194";
+    opacity: 0.75;
+  }
+
+  /* Everything else recedes while a move is in progress. */
+  #grid.arranging .tile:not(.moving) { filter: saturate(0.1) brightness(0.34); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile.moving { transform: none; }
+  }
+
   /* ---- footer ---- */
   footer {
     display: flex;
@@ -177,6 +201,7 @@
       <span><b>Arrows</b>move</span>
       <span><b>OK</b>open</span>
       <span><b>Back</b>close</span>
+      <span><b>Hold OK</b>rearrange</span>
     </div>
   </footer>
 </div>
@@ -193,6 +218,13 @@
   let services = [];
   let tiles = [];
   let cursor = 0;
+
+  // Reordering state. `moving` is the index of the picked-up tile, or -1.
+  let moving = -1;
+  let orderBeforeMove = null;
+  let holdTimer = null;
+  let holdFired = false;
+  let dragFrom = null;
 
   // Not part of services.json. Appended to the grid so there is a way out of
   // the launcher using only the arrow keys a remote sends.
@@ -233,14 +265,100 @@
       t.setAttribute("aria-selected", on ? "true" : "false");
       t.tabIndex = on ? 0 : -1;
     });
+    tiles.forEach((t, i) => t.classList.toggle("moving", i === moving));
+
     const svc = services[cursor];
-    note.textContent = svc && svc.note ? svc.note : "";
+    if (moving >= 0) {
+      note.textContent = "Moving " + svc.name +
+        ". Arrows place it, Enter keeps it, Escape puts it back.";
+    } else {
+      note.textContent = svc && svc.note ? svc.note : "";
+    }
 
     // Keyboard focus has to drag the viewport with it, otherwise rows past the
     // fold are selectable but never visible. "nearest" scrolls the minimum
     // amount, so tiles already on screen do not jump around.
     const active = tiles[cursor];
     if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  /* ---------- reordering ---------- */
+
+  // FLIP: measure, mutate, then animate each tile from where it used to be.
+  // The picked-up tile is skipped because its own transform is doing the work.
+  function flip(mutate) {
+    const before = new Map(tiles.map(t => [t, t.getBoundingClientRect()]));
+    mutate();
+    tiles.forEach(t => {
+      if (t.classList.contains("moving")) return;
+      const b = before.get(t);
+      if (!b) return;
+      const a = t.getBoundingClientRect();
+      const dx = b.left - a.left;
+      const dy = b.top - a.top;
+      if (!dx && !dy) return;
+      t.animate(
+        [{ transform: "translate(" + dx + "px," + dy + "px)" }, { transform: "none" }],
+        { duration: 190, easing: "cubic-bezier(0.2, 0, 0, 1)" }
+      );
+    });
+  }
+
+  // The exit tile is pinned last and cannot be picked up or displaced.
+  function movableCount() {
+    return services.length - 1;
+  }
+
+  function syncDom() {
+    tiles.forEach(t => grid.appendChild(t));
+  }
+
+  function reorder(from, to) {
+    if (to < 0 || to >= movableCount() || from === to) return false;
+    flip(() => {
+      services.splice(to, 0, services.splice(from, 1)[0]);
+      tiles.splice(to, 0, tiles.splice(from, 1)[0]);
+      syncDom();
+    });
+    moving = to;
+    cursor = to;
+    paint();
+    return true;
+  }
+
+  function pickUp(i) {
+    if (i < 0 || i >= movableCount()) return;
+    moving = i;
+    cursor = i;
+    orderBeforeMove = services.slice();
+    grid.classList.add("arranging");
+    paint();
+  }
+
+  function drop(save) {
+    if (moving < 0) return;
+    const wasMoving = moving;
+    moving = -1;
+    grid.classList.remove("arranging");
+    if (!save && orderBeforeMove) {
+      flip(() => {
+        const byId = new Map(services.map((s, i) => [s.id, tiles[i]]));
+        services = orderBeforeMove.slice();
+        tiles = services.map(s => byId.get(s.id));
+        syncDom();
+      });
+      cursor = services.findIndex(s => s === orderBeforeMove[wasMoving]);
+    } else {
+      post("/order", { ids: services.slice(0, movableCount()).map(s => s.id) })
+        .then(res => {
+          if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
+        })
+        .catch(() => {
+          note.innerHTML = '<span id="fault">Could not save the new order.</span>';
+        });
+    }
+    orderBeforeMove = null;
+    paint();
   }
 
   function move(delta) {
@@ -266,8 +384,25 @@
       label.textContent = svc.name;
       btn.appendChild(label);
 
-      btn.addEventListener("click", () => { cursor = i; paint(); open(); });
-      btn.addEventListener("mouseenter", () => { cursor = i; paint(); });
+      btn.addEventListener("click", () => {
+        // Suppressed after a drag so dropping a tile does not also launch it.
+        if (btn.dataset.dragged === "1") { delete btn.dataset.dragged; return; }
+        cursor = tiles.indexOf(btn);
+        paint();
+        open();
+      });
+      btn.addEventListener("mouseenter", () => {
+        const at = tiles.indexOf(btn);
+        if (moving >= 0) { reorder(moving, at); return; }
+        cursor = at;
+        paint();
+      });
+      btn.addEventListener("mousedown", e => {
+        if (e.button !== 0) return;
+        const at = tiles.indexOf(btn);
+        if (at >= movableCount()) return;
+        dragFrom = { x: e.clientX, y: e.clientY, index: at };
+      });
       grid.appendChild(btn);
       return btn;
     });
@@ -317,19 +452,61 @@
   /* ---------- input ---------- */
   document.addEventListener("keydown", e => {
     const cols = columns();
+
+    if (e.key === "Enter" || e.key === " ") {
+      if (e.repeat) { e.preventDefault(); return; }
+      if (moving >= 0) { drop(true); e.preventDefault(); return; }
+      // Hold to pick a tile up; a short press still just opens it.
+      holdFired = false;
+      if (holdTimer === null && cursor < movableCount()) {
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          holdFired = true;
+          pickUp(cursor);
+        }, 550);
+      }
+      e.preventDefault();
+      return;
+    }
+
     switch (e.key) {
-      case "ArrowLeft":  move(-1); break;
-      case "ArrowRight": move(1); break;
-      case "ArrowUp":    move(-cols); break;
-      case "ArrowDown":  move(cols); break;
-      case "Enter":
-      case " ":          open(); break;
+      case "ArrowLeft":  moving >= 0 ? reorder(moving, moving - 1) : move(-1); break;
+      case "ArrowRight": moving >= 0 ? reorder(moving, moving + 1) : move(1); break;
+      case "ArrowUp":    moving >= 0 ? reorder(moving, moving - cols) : move(-cols); break;
+      case "ArrowDown":  moving >= 0 ? reorder(moving, moving + cols) : move(cols); break;
       case "Escape":
       case "Backspace":
-      case "Home":       close(); break;
+      case "Home":
+        if (moving >= 0) drop(false); else close();
+        break;
       default: return;
     }
     e.preventDefault();
+  });
+
+  document.addEventListener("keyup", e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    if (holdTimer !== null) {
+      clearTimeout(holdTimer);
+      holdTimer = null;
+      if (!holdFired && moving < 0) open();
+    }
+    e.preventDefault();
+  });
+
+  // Mouse dragging shares the same move mode the keyboard uses, so both end
+  // up in reorder() and animate identically.
+  document.addEventListener("mousemove", e => {
+    if (!dragFrom || moving >= 0) return;
+    const dx = e.clientX - dragFrom.x;
+    const dy = e.clientY - dragFrom.y;
+    if (dx * dx + dy * dy < 64) return;   // 8px threshold, ignores a shaky click
+    pickUp(dragFrom.index);
+    tiles[moving].dataset.dragged = "1";
+  });
+  document.addEventListener("mouseup", () => {
+    dragFrom = null;
+    if (moving >= 0) drop(true);
   });
 
   // Reveal the cursor only once a pointing device is actually used, so an

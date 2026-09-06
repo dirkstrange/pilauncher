@@ -11,6 +11,7 @@ Environment overrides:
     PILAUNCHER_PORT       listen port             (default: 8800)
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
     PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
+    PILAUNCHER_ORDER      saved tile order (default: alongside the profiles)
 """
 
 from __future__ import annotations
@@ -36,6 +37,9 @@ PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
 # A known-good Widevine CDM copied into each new profile. See seed_widevine().
 CDM_SEED = Path(os.environ.get("PILAUNCHER_CDM_SEED", PROFILE_ROOT.parent / "widevine"))
+# Tile order lives outside the repo. services.json is the catalog and is
+# tracked in git; rewriting it from the UI would conflict with every pull.
+ORDER_FILE = Path(os.environ.get("PILAUNCHER_ORDER", PROFILE_ROOT.parent / "order.json"))
 
 # Flags applied to every service window. Kiosk gives a bare fullscreen surface;
 # the rest suppress the dialogs and bubbles that would otherwise appear on a TV
@@ -64,13 +68,35 @@ _proc: subprocess.Popen | None = None
 _lock = threading.Lock()
 
 
-def load_services() -> list[dict]:
+def load_catalog() -> list[dict]:
+    """The catalog as written in services.json, in file order."""
     with open(BASE / "services.json", encoding="utf-8") as fh:
         return json.load(fh)
 
 
+def load_services() -> list[dict]:
+    """The catalog in display order, honouring a saved arrangement."""
+    services = load_catalog()
+    try:
+        ids = json.loads(ORDER_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return services
+    if not isinstance(ids, list):
+        return services
+    rank = {sid: i for i, sid in enumerate(ids)}
+    # sorted() is stable, so a service added to the catalog after the order was
+    # saved keeps its relative position and lands at the end rather than
+    # vanishing or jumping to the front.
+    return sorted(services, key=lambda s: rank.get(s.get("id"), len(rank)))
+
+
+def save_order(ids: list[str]) -> None:
+    ORDER_FILE.parent.mkdir(parents=True, exist_ok=True)
+    ORDER_FILE.write_text(json.dumps(ids, indent=2), encoding="utf-8")
+
+
 def find_service(service_id: str) -> dict | None:
-    for svc in load_services():
+    for svc in load_catalog():
         if svc.get("id") == service_id:
             return svc
     return None
@@ -230,6 +256,22 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, {"launched": svc["id"], "pid": pid})
         elif path == "/close":
             self._json(200, {"closed": stop_current()})
+        elif path == "/order":
+            ids = payload.get("ids")
+            if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):
+                self._json(400, {"error": "ids must be a list of strings"})
+                return
+            known = {s.get("id") for s in load_catalog()}
+            unknown = [i for i in ids if i not in known]
+            if unknown:
+                self._json(400, {"error": f"unknown service ids: {unknown[:3]}"})
+                return
+            try:
+                save_order(ids)
+            except OSError as exc:
+                self._json(500, {"error": f"could not save order: {exc}"})
+                return
+            self._json(200, {"saved": len(ids)})
         elif path == "/desktop":
             if stop_shell():
                 self._json(200, {"desktop": True})
