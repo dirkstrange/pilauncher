@@ -134,11 +134,23 @@ PY
   ok "keybinds added (Alt+Escape, Home, Alt+F4)"
 fi
 
-# Stop the display blanking mid-film.
+# Stop the display blanking mid-film. autostart follows the same XDG lookup as
+# rc.xml: the first file found wins, so a user autostart REPLACES the system
+# one rather than adding to it. Writing a bare wlopm line here would drop
+# pcmanfm-pi, wf-panel-pi and kanshi from the session. Seed from the system
+# copy first, exactly as with rc.xml above.
 if [ -f "$LABWC_DIR/autostart" ] && grep -q wlopm "$LABWC_DIR/autostart"; then
   ok "screen blanking already handled"
 else
-  echo "wlopm --on '*'" >> "$LABWC_DIR/autostart"
+  if [ ! -f "$LABWC_DIR/autostart" ] && [ -f /etc/xdg/labwc/autostart ]; then
+    cp /etc/xdg/labwc/autostart "$LABWC_DIR/autostart"
+    ok "seeded autostart from /etc/xdg/labwc/autostart"
+  fi
+  cat >> "$LABWC_DIR/autostart" <<AUTOSTART
+
+# pilauncher: keep the display awake during playback.
+wlopm --on '*'
+AUTOSTART
   ok "added wlopm to labwc autostart"
 fi
 
