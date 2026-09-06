@@ -29,6 +29,8 @@ those is fixable from this end.
 - `services.json` is the catalog of services. Edit it to add or remove tiles;
   nothing else in the code knows what Netflix is.
 - `back.sh` closes whatever service is open. It gets bound to a hotkey.
+- `desktop.sh` switches between the launcher and the Pi desktop, also bound
+  to a hotkey.
 
 The server binds to localhost, so nothing outside the Pi can reach it.
 
@@ -221,6 +223,31 @@ ps -e | grep -E 'labwc|wayfire|Xorg'
 Older Pi OS releases used Wayfire, and much older ones X11. The keybind syntax
 differs for each. Most kiosk guides online are written for X11 and will not
 apply.
+
+## Leaving the launcher
+
+The launcher covers the desktop and restarts itself if you close its window, so
+there are two deliberate ways out and both come back the same way.
+
+From the couch, arrow to the last tile, "Exit to Desktop", and press Enter. It
+posts to `/desktop`, which closes any open service and stops the shell unit.
+The Pi desktop is underneath. `Ctrl+Alt+D` does the same thing from anywhere,
+including from inside a service window.
+
+To get back, use the Media Launcher icon on the Pi desktop, or press
+`Ctrl+Alt+D` again. Compositor keybinds keep working at the desktop, so the one
+key covers both directions.
+
+The daemon keeps running the whole time. Only the Chromium window that draws
+the tiles stops, which is why returning is close to instant and why the desktop
+shortcut only has to start one unit:
+
+```bash
+systemctl --user start pilauncher-shell.service
+```
+
+That is also the command to run over SSH if you ever end up somewhere the
+keybinds do not reach.
 
 ## Screen blanking
 
