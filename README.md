@@ -70,6 +70,9 @@ After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_SESSION_TYPE=wayland
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && exit 0; sleep 1; done; echo "wayland socket never appeared" >&2; exit 1'
 ExecStart=/usr/bin/python3 %h/pilauncher/launcher.py
 Restart=on-failure
 RestartSec=2
@@ -77,6 +80,18 @@ RestartSec=2
 [Install]
 WantedBy=default.target
 ```
+
+The two `Environment` lines are not optional, and the reason is worth knowing
+because the failure looks like a launcher bug rather than an environment one.
+The compositor imports `WAYLAND_DISPLAY` into the systemd user environment
+shortly after it starts, and a unit ordered `After=graphical-session.target`
+can still start before that import lands. When it does, the daemon inherits no
+display, so every Chromium it spawns picks the X11 backend and exits
+immediately with `Missing X server or $DISPLAY`. The HTTP call still returns
+`200` with a pid, because the process really was created; it just died a
+moment later. Tiles stop opening and nothing in the launcher's own logs
+explains why. Setting the variables explicitly takes the timing out of it, and
+the `ExecStartPre` waits for the compositor socket rather than assuming it.
 
 `~/.config/systemd/user/pilauncher-shell.service`
 
@@ -88,7 +103,9 @@ Requires=pilauncher.service
 PartOf=graphical-session.target
 
 [Service]
-ExecStartPre=/bin/sleep 3
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_SESSION_TYPE=wayland
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8800/status && exit 0; sleep 1; done; echo "daemon never came up" >&2; exit 1'
 ExecStart=/usr/bin/chromium --kiosk --noerrdialogs \
   --disable-infobars --disable-session-crashed-bubble \
   --user-data-dir=%h/.local/share/pilauncher/shell \
@@ -99,6 +116,11 @@ RestartSec=3
 [Install]
 WantedBy=default.target
 ```
+
+The shell unit waits for the daemon to answer rather than sleeping a fixed
+three seconds. A blind sleep happened to work here, but only because it pushed
+the shell past the environment import by luck; the daemon starting at the same
+instant is what broke.
 
 ```bash
 systemctl --user daemon-reload
