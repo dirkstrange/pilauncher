@@ -53,11 +53,16 @@
   /* ---- header ---- */
   header {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
   }
+  #stamp {
+    display: flex;
+    flex-direction: column;
+    gap: 0.28em;
+  }
   #clock {
-    font-size: clamp(28px, 3.4vw, 66px);
+    font-size: clamp(24px, 2.8vw, 54px);
     font-variation-settings: "wdth" 78, "wght" 500;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
@@ -67,6 +72,39 @@
     font-size: clamp(13px, 1.15vw, 22px);
     font-variation-settings: "wdth" 100, "wght" 400;
     color: var(--haze);
+  }
+
+  /* Leaving the launcher was a tile at the end of the grid, which put it in
+     the way of the services. As a corner control it is out of the way but
+     still reachable with arrows: Up from the top row lands here. */
+  #power {
+    border: 0;
+    background: var(--ink-raised);
+    color: var(--haze);
+    width: clamp(44px, 3.6vw, 68px);
+    height: clamp(44px, 3.6vw, 68px);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: transform 140ms ease, background 140ms ease,
+                color 140ms ease, box-shadow 140ms ease;
+  }
+  #power svg {
+    width: 52%;
+    height: 52%;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+  }
+  #power.focused {
+    background: #E8402F;
+    color: #FFFFFF;
+    transform: scale(1.12);
+    box-shadow:
+      0 0 46px -8px #E8402F,
+      0 14px 30px -14px rgba(0, 0, 0, 0.9);
   }
 
   /* ---- grid ---- */
@@ -322,8 +360,16 @@
 <body>
 <div id="shell">
   <header>
-    <div id="clock">--:--</div>
-    <div id="date"></div>
+    <div id="stamp">
+      <div id="clock">--:--</div>
+      <div id="date"></div>
+    </div>
+    <button id="power" type="button" aria-label="Exit to the Raspberry Pi desktop">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3.5 v8" />
+        <path d="M6.3 6.6 a7.5 7.5 0 1 0 11.4 0" />
+      </svg>
+    </button>
   </header>
 
   <div id="grid" role="listbox" aria-label="Services"></div>
@@ -367,16 +413,10 @@
   let holdFired = false;
   let dragFrom = null;
 
-  // Not part of services.json. Appended to the grid so there is a way out of
-  // the launcher using only the arrow keys a remote sends.
-  const EXIT_TILE = {
-    id: "__desktop__",
-    name: "Exit to Desktop",
-    color: "#39405A",
-    ink: "#DDE3F2",
-    note: "Closes the launcher and shows the Raspberry Pi desktop. " +
-          "Reopen it from the Media Launcher icon there, or press Ctrl+Alt+D."
-  };
+  // cursor === POWER means the corner power control has focus rather than any
+  // tile, which is how it stays reachable without a pointer.
+  const POWER = -1;
+  const power = document.getElementById("power");
 
   /* ---------- clock ---------- */
   function tick() {
@@ -400,6 +440,7 @@
   }
 
   function paint() {
+    power.classList.toggle("focused", cursor === POWER);
     tiles.forEach((t, i) => {
       const on = i === cursor;
       t.classList.toggle("focused", on);
@@ -412,7 +453,7 @@
     // The per-service note stays in services.json as catalog documentation but
     // is not shown; on a TV it was reading as clutter. The footer is still used
     // for the move-mode hint and for errors.
-    note.textContent = moving >= 0
+    note.textContent = moving >= 0 && svc
       ? "Moving " + svc.name + ". Arrows place it, Enter keeps it, Escape puts it back."
       : "";
 
@@ -445,9 +486,8 @@
     });
   }
 
-  // The exit tile is pinned last and cannot be picked up or displaced.
   function movableCount() {
-    return services.length - 1;
+    return services.length;
   }
 
   function syncDom() {
@@ -468,7 +508,7 @@
   }
 
   function pickUp(i) {
-    if (i < 0 || i >= movableCount()) return;
+    if (i < 0 || i >= movableCount()) return;   // never the power control
     moving = i;
     cursor = i;
     orderBeforeMove = services.slice();
@@ -504,14 +544,25 @@
 
   function move(delta) {
     if (!tiles.length) return;
+    const cols = columns();
+    if (cursor === POWER) {
+      // Only downward leaves the power control, back into the top row.
+      if (delta > 0) { cursor = Math.min(cols - 1, tiles.length - 1); paint(); }
+      return;
+    }
     const next = cursor + delta;
-    if (next < 0 || next >= tiles.length) return;
+    // Up from the top row reaches the power control instead of stopping dead.
+    if (next < 0) {
+      if (delta === -cols) { cursor = POWER; paint(); }
+      return;
+    }
+    if (next >= tiles.length) return;
     cursor = next;
     paint();
   }
 
   function build(list) {
-    services = list.concat([EXIT_TILE]);
+    services = list;
     grid.textContent = "";
     tiles = services.map((svc, i) => {
       const btn = document.createElement("button");
@@ -574,23 +625,24 @@
   }
 
   let busy = false;
+
+  function toDesktop() {
+    if (busy) return;
+    busy = true;
+    post("/desktop")
+      .then(res => {
+        if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
+      })
+      .catch(() => {
+        // Expected on success: the window this page runs in is being closed.
+      })
+      .finally(() => { setTimeout(() => { busy = false; }, 800); });
+  }
+
   function open() {
+    if (cursor === POWER) { toDesktop(); return; }
     const svc = services[cursor];
     if (!svc || busy) return;
-
-    if (svc.id === EXIT_TILE.id) {
-      busy = true;
-      post("/desktop")
-        .then(res => {
-          if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
-        })
-        .catch(() => {
-          // Expected on success: the window this page runs in is being closed.
-        })
-        .finally(() => { setTimeout(() => { busy = false; }, 800); });
-      return;
-    }
-
     busy = true;
     post("/launch", { id: svc.id })
       .then(res => {
@@ -613,7 +665,7 @@
       if (moving >= 0) { drop(true); e.preventDefault(); return; }
       // Hold to pick a tile up; a short press still just opens it.
       holdFired = false;
-      if (holdTimer === null && cursor < movableCount()) {
+      if (holdTimer === null && cursor >= 0 && cursor < movableCount()) {
         holdTimer = setTimeout(() => {
           holdTimer = null;
           holdFired = true;
@@ -648,6 +700,9 @@
     }
     e.preventDefault();
   });
+
+  power.addEventListener("click", () => { cursor = POWER; paint(); toDesktop(); });
+  power.addEventListener("mouseenter", () => { if (moving < 0) { cursor = POWER; paint(); } });
 
   // Mouse dragging shares the same move mode the keyboard uses, so both end
   // up in reorder() and animate identically.
