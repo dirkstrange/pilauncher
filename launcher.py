@@ -43,6 +43,10 @@ COMMON_FLAGS = [
     "--autoplay-policy=no-user-gesture-required",
     "--check-for-update-interval=31536000",
     "--password-store=basic",
+    # Service pages render their own scrollbars, which look wrong on a TV and
+    # cannot be reached without a pointer. Content still scrolls; only the bar
+    # is hidden.
+    "--hide-scrollbars",
 ]
 
 _proc: subprocess.Popen | None = None
