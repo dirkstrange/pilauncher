@@ -245,6 +245,11 @@ def remote_wallpapers() -> list[str]:
             # One dead feed should not take the others down with it.
             continue
 
+    # APOD counts animations as images, and they arrive as GIFs: diagrams of
+    # orbital mechanics, simulation loops, that sort of thing. They look wrong
+    # between photographs and they loop distractingly under the drift.
+    urls = [u for u in urls if ".gif" not in u.split("?")[0].lower()]
+
     if not urls:
         return cached.get("urls", []) if isinstance(cached, dict) else []
 
