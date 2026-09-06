@@ -6,7 +6,7 @@ Serves the tile UI on 127.0.0.1 and spawns one Chromium kiosk window per
 service, each with its own profile directory so sessions stay independent.
 
 Environment overrides:
-    PILAUNCHER_BROWSER    browser binary          (default: chromium-browser)
+    PILAUNCHER_BROWSER    browser binary          (default: chromium)
     PILAUNCHER_PROFILES   profile root directory
     PILAUNCHER_PORT       listen port             (default: 8800)
 """
@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
-BROWSER = os.environ.get("PILAUNCHER_BROWSER", "chromium-browser")
+BROWSER = os.environ.get("PILAUNCHER_BROWSER", "chromium")
 PROFILE_ROOT = Path(
     os.environ.get(
         "PILAUNCHER_PROFILES", Path.home() / ".local" / "share" / "pilauncher" / "profiles"

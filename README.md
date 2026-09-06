@@ -21,7 +21,7 @@ crash in one player cannot take the rest down. Profiles live under
 
 ```bash
 sudo apt update
-sudo apt install -y chromium-browser libwidevinecdm0 curl
+sudo apt install -y chromium libwidevinecdm0 curl
 mkdir -p ~/pilauncher
 # copy launcher.py, index.html, services.json, back.sh into ~/pilauncher
 chmod +x ~/pilauncher/launcher.py ~/pilauncher/back.sh
@@ -33,8 +33,8 @@ load at all. Without it those sites will not present a player.
 Verify the CDM registered:
 
 ```bash
-ls ~/.config/chromium/WidevineCdm/ 2>/dev/null
-chromium-browser --version
+ls /opt/WidevineCdm/_platform_specific/linux_arm64/
+chromium --version
 ```
 
 Then open `https://bitmovin.com/demos/drm` in Chromium and confirm the
@@ -50,7 +50,7 @@ python3 ~/pilauncher/launcher.py
 In a second terminal:
 
 ```bash
-chromium-browser --kiosk \
+chromium --kiosk \
   --user-data-dir="$HOME/.local/share/pilauncher/shell" \
   http://127.0.0.1:8800
 ```
@@ -87,7 +87,7 @@ Requires=pilauncher.service
 
 [Service]
 ExecStartPre=/bin/sleep 3
-ExecStart=/usr/bin/chromium-browser --kiosk --noerrdialogs \
+ExecStart=/usr/bin/chromium --kiosk --noerrdialogs \
   --disable-infobars --disable-session-crashed-bubble \
   --user-data-dir=%h/.local/share/pilauncher/shell \
   http://127.0.0.1:8800
