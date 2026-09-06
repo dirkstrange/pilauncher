@@ -21,6 +21,7 @@ will be used; nothing here has to succeed for the launcher to work.
 from __future__ import annotations
 
 import argparse
+import http.client
 import io
 import json
 import os
@@ -40,6 +41,9 @@ UA = (
     "(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
 )
 TIMEOUT = 15
+# Streaming sites chunk aggressively and some close early; a partial read is a
+# failed candidate, not a crash.
+NET_ERRORS = (urllib.error.URLError, OSError, http.client.HTTPException, ValueError)
 EXT_BY_TYPE = {
     "image/svg+xml": ".svg",
     "image/png": ".png",
@@ -93,7 +97,7 @@ def manifest_icons(page: str, base_url: str) -> list[tuple[int, str]]:
     try:
         raw, _ = get(urllib.parse.urljoin(base_url, href.group(1)))
         data = json.loads(raw)
-    except (urllib.error.URLError, OSError, ValueError):
+    except NET_ERRORS:
         return []
     out = []
     for icon in data.get("icons", []) or []:
@@ -120,7 +124,7 @@ def fetch_one(svc: dict, dest_dir: Path, force: bool) -> str:
     try:
         page_bytes, _ = get(url)
         page = page_bytes.decode("utf-8", "replace")
-    except (urllib.error.URLError, OSError) as exc:
+    except NET_ERRORS as exc:
         page = ""
         note = f"page unreadable ({exc.__class__.__name__})"
     else:
@@ -137,7 +141,7 @@ def fetch_one(svc: dict, dest_dir: Path, force: bool) -> str:
         seen.add(icon_url)
         try:
             data, ctype = get(icon_url)
-        except (urllib.error.URLError, OSError):
+        except NET_ERRORS:
             continue
         ext = EXT_BY_TYPE.get(ctype)
         if ext is None:
