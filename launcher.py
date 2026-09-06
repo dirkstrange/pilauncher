@@ -10,12 +10,14 @@ Environment overrides:
     PILAUNCHER_PROFILES   profile root directory
     PILAUNCHER_PORT       listen port             (default: 8800)
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
+    PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
 """
 
 from __future__ import annotations
 
 import json
 import os
+import shutil
 import signal
 import subprocess
 import threading
@@ -32,6 +34,8 @@ PROFILE_ROOT = Path(
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
+# A known-good Widevine CDM copied into each new profile. See seed_widevine().
+CDM_SEED = Path(os.environ.get("PILAUNCHER_CDM_SEED", PROFILE_ROOT.parent / "widevine"))
 
 # Flags applied to every service window. Kiosk gives a bare fullscreen surface;
 # the rest suppress the dialogs and bubbles that would otherwise appear on a TV
@@ -45,17 +49,9 @@ COMMON_FLAGS = [
     "--autoplay-policy=no-user-gesture-required",
     "--check-for-update-interval=31536000",
     "--password-store=basic",
-    # Chromium's component updater downloads its own Widevine CDM into each
-    # profile and prefers it over the system one from libwidevinecdm0. On this
-    # Pi the downloaded build fails Netflix playback with E100 while the
-    # packaged build plays fine. The download lands silently mid-session and
-    # only takes effect on the next launch, so playback that worked keeps
-    # working until the window is reopened, which makes it read as a
-    # service-side problem rather than a local one.
-    "--disable-component-update",
     # Service pages draw their own scrollbars, which look wrong on a TV and
     # cannot be grabbed without a pointer. Scrolling still works; only the bar
-    # is hidden. Ruled out as a cause of the E100 failures above.
+    # is hidden.
     "--hide-scrollbars",
 ]
 
@@ -101,6 +97,7 @@ def start_service(svc: dict) -> int:
 
     profile = PROFILE_ROOT / svc["id"]
     profile.mkdir(parents=True, exist_ok=True)
+    seed_widevine(profile)
 
     argv = [BROWSER, *COMMON_FLAGS, f"--user-data-dir={profile}"]
     if svc.get("user_agent"):
@@ -114,6 +111,34 @@ def start_service(svc: dict) -> int:
     with _lock:
         _proc = proc
     return proc.pid
+
+
+def seed_widevine(profile: Path) -> None:
+    """Give a new profile a Widevine CDM so DRM works the first time it opens.
+
+    Chromium registers a CDM only from the profile's own directory, located
+    through a hint file holding an absolute path. It does not look at the
+    packaged CDM in /opt/WidevineCdm at all. Left alone, a fresh profile fails
+    DRM once, quietly downloads a CDM, and only plays on the next launch, which
+    reads as a broken service rather than a cold profile.
+    """
+    dest = profile / "WidevineCdm"
+    if dest.exists() or not CDM_SEED.is_dir():
+        return
+    versions = [p for p in CDM_SEED.iterdir() if p.is_dir()]
+    if not versions:
+        return
+    try:
+        shutil.copytree(CDM_SEED, dest)
+        newest = max(versions, key=lambda p: p.name).name
+        # The hint path is absolute, so it has to be rewritten per profile.
+        (dest / "latest-component-updated-widevine-cdm").write_text(
+            json.dumps({"Path": str(dest / newest)}), encoding="utf-8"
+        )
+    except OSError:
+        # Not fatal. The component updater will fetch one on its own; the
+        # service just will not play protected content until it reopens.
+        pass
 
 
 def stop_shell() -> bool:
