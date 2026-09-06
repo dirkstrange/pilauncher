@@ -51,6 +51,10 @@ COMMON_FLAGS = [
     # working until the window is reopened, which makes it read as a
     # service-side problem rather than a local one.
     "--disable-component-update",
+    # Service pages draw their own scrollbars, which look wrong on a TV and
+    # cannot be grabbed without a pointer. Scrolling still works; only the bar
+    # is hidden. Ruled out as a cause of the E100 failures above.
+    "--hide-scrollbars",
 ]
 
 _proc: subprocess.Popen | None = None
