@@ -156,7 +156,12 @@ update-desktop-database "$APPS" >/dev/null 2>&1 || true
 say "Starting services"
 
 chmod +x "$HERE/launcher.py" "$HERE/back.sh" "$HERE/desktop.sh" 2>/dev/null || true
-systemctl --user enable --now pilauncher.service pilauncher-shell.service
+systemctl --user enable pilauncher.service pilauncher-shell.service
+
+# Restart rather than start. On a re-run after a git pull the units are already
+# up, and "start" on a running unit does nothing, so new code in launcher.py
+# would not take effect and the script would report success anyway.
+systemctl --user restart pilauncher.service pilauncher-shell.service
 
 for i in $(seq 1 30); do
   if curl -fsS -o /dev/null "http://127.0.0.1:$PORT/status" 2>/dev/null; then
