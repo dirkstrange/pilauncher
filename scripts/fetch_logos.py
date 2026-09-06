@@ -54,6 +54,40 @@ EXT_BY_TYPE = {
 }
 
 
+MIN_EDGE = 120          # anything smaller looks soft blown up to tile size
+
+
+def sniff(data: bytes) -> str | None:
+    """Real format from the bytes. Content-Type lies often enough to matter."""
+    if data[:8] == bytes([137, 80, 78, 71, 13, 10, 26, 10]):
+        return ".png"
+    if data[:3] == b"GIF":
+        return ".gif"
+    if data[:2] == bytes([255, 216]):
+        return ".jpg"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    if data[:4] == bytes([0, 0, 1, 0]):
+        return ".ico"
+    head = data[:400].lstrip()
+    if head[:5] == b"<?xml" or head[:4] == b"<svg":
+        return ".svg"
+    return None
+
+
+def measure(data: bytes, ext: str) -> int:
+    """Longest edge in pixels. SVG scales, so it always clears the bar."""
+    if ext == ".svg":
+        return 10000
+    try:
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as im:
+            return max(im.size)
+    except Exception:
+        # Without Pillow, fall back to file size as a rough proxy.
+        return 200 if len(data) > 6000 else 0
+
+
 def get(url: str) -> tuple[bytes, str]:
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
@@ -78,11 +112,13 @@ def candidates(page: str, base_url: str) -> list[tuple[int, str]]:
             continue
         rel_v = rel.group(1).lower()
         url = urllib.parse.urljoin(base_url, href.group(1))
+        # SVG wins outright, it scales to any tile size.
+        bonus = 5000 if url.lower().endswith(".svg") else 0
         if "apple-touch-icon" in rel_v:
             # Ranked above manifest icons: square, meant to be seen large.
-            found.append((1000 + size_of(tag), url))
+            found.append((bonus + 1000 + size_of(tag), url))
         elif "icon" in rel_v:
-            found.append((size_of(tag), url))
+            found.append((bonus + size_of(tag), url))
     found.sort(key=lambda p: -p[0])
     return found
 
@@ -131,10 +167,12 @@ def fetch_one(svc: dict, dest_dir: Path, force: bool) -> str:
         note = ""
 
     tries = candidates(page, url) + manifest_icons(page, url)
-    tries.append((0, origin + "/apple-touch-icon.png"))
-    tries.append((0, origin + "/favicon.ico"))
+    for guess in ("/apple-touch-icon.png", "/apple-touch-icon-precomposed.png",
+                  "/favicon.svg", "/web/favicon.ico", "/favicon.ico"):
+        tries.append((0, origin + guess))
 
     seen = set()
+    best_reject = 0
     for _, icon_url in tries:
         if icon_url in seen:
             continue
@@ -143,19 +181,22 @@ def fetch_one(svc: dict, dest_dir: Path, force: bool) -> str:
             data, ctype = get(icon_url)
         except NET_ERRORS:
             continue
-        ext = EXT_BY_TYPE.get(ctype)
-        if ext is None:
-            ext = os.path.splitext(urllib.parse.urlsplit(icon_url).path)[1].lower()
-            if ext not in EXT_BY_TYPE.values():
-                continue
-        if len(data) < 400:
-            continue  # a placeholder or an error page, not a real icon
-        for old in dest_dir.glob(sid + ".*"):
-            old.unlink()
+        ext = sniff(data)
+        if ext is None or ext == ".ico":
+            continue  # unrecognised, or an .ico the browser would have to decode
+        edge = measure(data, ext)
+        if edge < MIN_EDGE:
+            best_reject = max(best_reject, edge)
+            continue
+        for stale in dest_dir.glob(sid + ".*"):
+            stale.unlink()
         out = dest_dir / (sid + ext)
         out.write_bytes(data)
-        return f"got {out.name} ({len(data) // 1024}KB) from {urllib.parse.urlsplit(icon_url).netloc}"
+        size = "scalable" if ext == ".svg" else f"{edge}px"
+        return f"got {out.name} ({size})"
 
+    if best_reject:
+        return f"nothing above {MIN_EDGE}px, largest was {best_reject}px"
     return f"no icon found{', ' + note if note else ''}"
 
 
