@@ -666,8 +666,9 @@
 
   /* ---------- screensaver ---------- */
 
-  const IDLE_MS = 30 * 1000;        // TEMPORARY: 30s for testing, 10 * 60 * 1000 normally
-  const SLIDE_MS = 30 * 1000;       // how long each picture holds
+  const IDLE_MS = 10 * 60 * 1000;   // idle time on the tile screen before it starts
+  const SLIDE_MS = 45 * 1000;       // how long each picture holds
+  const BUSY_MS = 30 * 1000;        // recheck interval while a service is open
 
   const saver = document.getElementById("saver");
   const frames = [document.getElementById("frameA"), document.getElementById("frameB")];
@@ -739,17 +740,38 @@
     frames.forEach(f => f.classList.remove("show"));
   }
 
-  function poke() {
+  // Whether a service was open at the last check, so returning to the tiles
+  // restarts the countdown instead of tripping it immediately.
+  let wasRunning = false;
+
+  function armIdle(ms) {
     clearTimeout(idleTimer);
-    // Only idles on the tile screen. With a service open the launcher is
-    // covered anyway, and waking to a screensaver behind Netflix would be a
-    // surprise.
-    idleTimer = setTimeout(() => {
-      fetch("/status")
-        .then(r => r.json())
-        .then(s => { if (!s.running) startSaver(); })
-        .catch(() => startSaver());
-    }, IDLE_MS);
+    idleTimer = setTimeout(checkIdle, ms);
+  }
+
+  function checkIdle() {
+    // The launcher page keeps running underneath an open service and receives
+    // no input there, so elapsed time alone would trip the screensaver behind
+    // whatever is playing. The daemon knows whether a window is open.
+    fetch("/status")
+      .then(r => r.json())
+      .then(s => {
+        if (s.running) {
+          wasRunning = true;
+          armIdle(BUSY_MS);          // still watching something, keep waiting
+        } else if (wasRunning) {
+          wasRunning = false;
+          armIdle(IDLE_MS);          // just came back to the tiles, start over
+        } else {
+          startSaver();
+        }
+      })
+      .catch(() => armIdle(BUSY_MS));
+  }
+
+  function poke() {
+    wasRunning = false;
+    armIdle(IDLE_MS);
   }
 
   // Any input dismisses it. The event that woke the screen is swallowed, so
