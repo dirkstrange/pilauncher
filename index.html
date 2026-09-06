@@ -95,33 +95,56 @@
     aspect-ratio: 16 / 10;
     border: 0;
     border-radius: 14px;
-    background: var(--tint);
+    background: transparent;
     color: var(--tint-ink);
     display: flex;
-    align-items: flex-end;
-    padding: clamp(12px, 1.1vw, 24px);
-    font-family: inherit;
-    text-align: left;
-    /* Unfocused tiles recede: drained of colour and brightness. The focused
-       tile is the only thing in the room that looks switched on. */
-    filter: saturate(0.18) brightness(0.5);
-    transition: filter 140ms ease, transform 140ms ease, box-shadow 140ms ease;
-  }
-  .tile .label {
-    font-size: clamp(16px, 1.55vw, 32px);
-    font-variation-settings: "wdth" 112, "wght" 700;
-    letter-spacing: -0.015em;
-    line-height: 1.05;
-  }
-
-  /* A tile with a logo centres it and drops the wordmark. Services that have
-     no usable logo keep the original bottom-left name, which is why both
-     treatments have to look deliberate rather than one looking like a
-     fallback. */
-  .tile.has-logo {
     align-items: center;
     justify-content: center;
+    padding: clamp(12px, 1.1vw, 24px);
+    font-family: inherit;
+    text-align: center;
+    transition: transform 140ms ease, box-shadow 140ms ease;
   }
+
+  /* The tile's colour lives on a pseudo-element so the recede effect can be
+     applied to the background alone. Filtering the tile itself would drain the
+     logo with it, which turned every brand mark chalky. */
+  .tile::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: var(--tint);
+    filter: saturate(0.18) brightness(0.5);
+    transition: filter 140ms ease;
+  }
+  .tile > * {
+    position: relative;
+    z-index: 1;
+  }
+  .tile.focused::before { filter: none; }
+
+  /* Content dims by fading rather than desaturating, so an unfocused logo is
+     still recognisably its own colour. */
+  .tile .label,
+  .tile .logo {
+    opacity: 0.62;
+    transition: opacity 140ms ease;
+  }
+  .tile.focused .label,
+  .tile.focused .logo { opacity: 1; }
+  .tile .label {
+    font-size: clamp(20px, 2.6vw, 46px);
+    font-variation-settings: "wdth" 108, "wght" 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    max-width: 92%;
+  }
+
+  /* A logo replaces the wordmark. Tiles without one show the service name
+     centred at the same weight, so a text tile reads as its own treatment
+     rather than as a logo that failed to arrive. */
   .tile .logo {
     max-width: 93%;
     max-height: 87%;
@@ -141,7 +164,6 @@
     white-space: nowrap;
   }
   .tile.focused {
-    filter: none;
     transform: scale(1.07);
     z-index: 2;
     box-shadow:
@@ -153,7 +175,6 @@
      tilted slightly, so it is obvious the next arrow press moves it rather
      than the cursor. */
   .tile.moving {
-    filter: none;
     z-index: 3;
     transform: scale(1.12) rotate(-1.4deg);
     box-shadow:
@@ -161,13 +182,19 @@
       0 32px 64px -20px rgba(0, 0, 0, 0.95);
     cursor: grabbing;
   }
+  .tile.moving::before { filter: none; }
+  .tile.moving .label,
+  .tile.moving .logo { opacity: 1; }
   .tile.moving .label::after {
     content: " \2194";
     opacity: 0.75;
   }
 
-  /* Everything else recedes while a move is in progress. */
-  #grid.arranging .tile:not(.moving) { filter: saturate(0.1) brightness(0.34); }
+  /* Everything else recedes while a move is in progress, background first so
+     the logos do not go grey. */
+  #grid.arranging .tile:not(.moving)::before { filter: saturate(0.1) brightness(0.3); }
+  #grid.arranging .tile:not(.moving) .label,
+  #grid.arranging .tile:not(.moving) .logo { opacity: 0.4; }
 
   @media (prefers-reduced-motion: reduce) {
     .tile.moving { transform: none; }
