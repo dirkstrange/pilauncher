@@ -109,19 +109,25 @@ else
   ok "keybinds added (Alt+Escape, Home, Alt+F4, Ctrl+Alt+D)"
 fi
 
-# Stop the display blanking mid-film. autostart follows the same XDG lookup as
-# rc.xml: the first file found wins, so a user autostart REPLACES the system
-# one rather than adding to it. Writing a bare wlopm line here would drop
-# pcmanfm-pi, wf-panel-pi and kanshi from the session. Seed from the system
-# copy first, exactly as with rc.xml above.
-if [ -f "$LABWC_DIR/autostart" ] && grep -q wlopm "$LABWC_DIR/autostart"; then
+# Stop the display blanking mid-film.
+#
+# labwc on Raspberry Pi OS runs with --merge-config, so a user autostart is
+# read IN ADDITION TO /etc/xdg/labwc/autostart, not instead of it. Seeding this
+# file from the system copy therefore starts pcmanfm-pi, wf-panel-pi and kanshi
+# a second time, which shows up as two stacked taskbars. Only additions belong
+# here.
+if grep -qs 'wf-panel-pi\|pcmanfm-pi' "$LABWC_DIR/autostart"; then
+  cp "$LABWC_DIR/autostart" "$LABWC_DIR/autostart.bak.$(date +%Y%m%d%H%M%S)"
+  rm -f "$LABWC_DIR/autostart"
+  warn "user autostart duplicated the system entries; rebuilt it (.bak kept)"
+fi
+
+if grep -qs wlopm "$LABWC_DIR/autostart"; then
   ok "screen blanking already handled"
 else
-  if [ ! -f "$LABWC_DIR/autostart" ] && [ -f /etc/xdg/labwc/autostart ]; then
-    cp /etc/xdg/labwc/autostart "$LABWC_DIR/autostart"
-    ok "seeded autostart from /etc/xdg/labwc/autostart"
-  fi
   cat >> "$LABWC_DIR/autostart" <<AUTOSTART
+# labwc here runs with --merge-config, so this file adds to
+# /etc/xdg/labwc/autostart rather than replacing it. Additions only.
 
 # pilauncher: keep the display awake during playback.
 wlopm --on '*'
