@@ -208,8 +208,11 @@
   /* ---------- clock ---------- */
   function tick() {
     const now = new Date();
-    clockEl.textContent = now.toLocaleTimeString([], {
-      hour: "2-digit", minute: "2-digit", hour12: false
+    // en-US rather than the system locale, which is en_GB on Raspberry Pi OS
+    // and renders the suffix lowercase as "pm". "numeric" drops the leading
+    // zero, so it reads 9:04 PM rather than 09:04 PM.
+    clockEl.textContent = now.toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true
     });
     dateEl.textContent = now.toLocaleDateString([], {
       weekday: "long", day: "numeric", month: "long"
