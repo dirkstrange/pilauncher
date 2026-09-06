@@ -37,7 +37,8 @@
     "url": "https://www.hulu.com/hub/home",
     "color": "#1CE783",
     "ink": "#062916",
-    "note": "Historically blocks Linux browsers. Needs a user_agent override to load."
+    "note": "Blocks Linux browsers. Sends a Windows Chrome user_agent so the player loads.",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
   },
   {
     "id": "paramount",
