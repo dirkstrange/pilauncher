@@ -19,3 +19,7 @@ shell/
 *.jpg
 *.jpeg
 
+
+# Predecessor LineageOS ROM, Magisk, gapps and widevine zips (~1GB). Kept for
+# reference, never part of the launcher.
+Lineage/
