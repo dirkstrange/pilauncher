@@ -134,9 +134,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._send(200, body, "text/html; charset=utf-8")
         elif path == "/services.json":
-            self._send(
-                200, json.dumps(load_services()).encode(), "application/json"
-            )
+            # Hidden entries stay in the catalog but off the screen. They are
+            # still launchable by id, so a service can be parked without
+            # losing its colours and notes.
+            visible = [s for s in load_services() if not s.get("hidden")]
+            self._send(200, json.dumps(visible).encode(), "application/json")
         elif path == "/status":
             self._json(200, {"running": service_running()})
         else:

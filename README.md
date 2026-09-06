@@ -170,9 +170,16 @@ Also disable the desktop screensaver in `raspi-config` under Display Options.
   "ink": "#FFFFFF",
   "note": "Shown at the bottom of the screen when focused.",
   "user_agent": "optional override",
-  "extra_flags": ["--optional-chromium-flag"]
+  "extra_flags": ["--optional-chromium-flag"],
+  "hidden": false
 }
 ```
+
+Set `hidden` to `true` to park an entry. It stays in the file with its colours
+and notes intact but is left out of the tile grid, which is the tidier option
+for a service you have not set up yet. Hidden entries can still be launched by
+id with a direct POST to `/launch`, which is useful for testing one before
+putting it back on screen.
 
 Changes take effect on the next launch; no restart needed, the daemon rereads
 the file per request.
@@ -192,5 +199,5 @@ not a default you inherited.
   L1 is unreachable. Netflix runs SD to 720p depending on title.
 - The Pi 5 has no hardware H.264 decoder. Browser DRM streams fall to CPU
   decode. At 720p this is fine; there is not much headroom above it.
-- The `plex` entry still points at a placeholder host. Edit it or drop the tile.
+- The `plex` entry is hidden and still points at a placeholder host.
 - Apple TV's web player is built around Safari and is unreliable here.

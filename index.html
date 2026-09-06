@@ -62,8 +62,22 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: var(--gap);
-    align-content: center;
+    /* "safe" keeps the rows centred while they fit, but falls back to
+       start-alignment once they overflow. Plain "center" pushes the first row
+       off the top of the scroll container where it can never be reached. */
+    align-content: safe center;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+    /* Focused tiles scale up and cast a glow; the padding keeps both off the
+       clipping edge, and the scroll padding stops a focused tile from landing
+       flush against the top or bottom while scrolling. */
+    padding: 1.4vh 1.2vw;
+    margin: -1.4vh -1.2vw;
+    scroll-padding: 3vh 0;
+    scrollbar-width: none;
   }
+  #grid::-webkit-scrollbar { display: none; }
   @media (max-width: 1100px) { #grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 700px)  { #grid { grid-template-columns: repeat(2, 1fr); } }
 
@@ -198,6 +212,12 @@
     });
     const svc = services[cursor];
     note.textContent = svc && svc.note ? svc.note : "";
+
+    // Keyboard focus has to drag the viewport with it, otherwise rows past the
+    // fold are selectable but never visible. "nearest" scrolls the minimum
+    // amount, so tiles already on screen do not jump around.
+    const active = tiles[cursor];
+    if (active) active.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   function move(delta) {

@@ -77,7 +77,8 @@
     "url": "http://localhost:32400/web",
     "color": "#E5A00D",
     "ink": "#2A1D02",
-    "note": "Point this at your own server. No DRM, so no resolution cap."
+    "note": "Hidden: no Plex server. Set a url and remove \"hidden\" to restore.",
+    "hidden": true
   },
   {
     "id": "jellyfin",
