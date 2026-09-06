@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400;62..125,500;62..125,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:        #0A0C12;
+    --ink-raised: #141824;
+    --chalk:      #EDEFF4;
+    --haze:       #79839B;
+    --safe-x: 4.5vw;
+    --safe-y: 4vh;
+    --gap: 1.6vw;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--ink);
+    color: var(--chalk);
+    font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    overflow: hidden;
+    cursor: none;
+  }
+  body.pointer { cursor: default; }
+
+  #shell {
+    height: 100%;
+    padding: var(--safe-y) var(--safe-x);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    row-gap: 3vh;
+  }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  #clock {
+    font-size: clamp(28px, 3.4vw, 66px);
+    font-variation-settings: "wdth" 78, "wght" 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  #date {
+    font-size: clamp(13px, 1.15vw, 22px);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    color: var(--haze);
+  }
+
+  /* ---- grid ---- */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--gap);
+    align-content: center;
+  }
+  @media (max-width: 1100px) { #grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 700px)  { #grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .tile {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border: 0;
+    border-radius: 14px;
+    background: var(--tint);
+    color: var(--tint-ink);
+    display: flex;
+    align-items: flex-end;
+    padding: clamp(12px, 1.1vw, 24px);
+    font-family: inherit;
+    text-align: left;
+    /* Unfocused tiles recede: drained of colour and brightness. The focused
+       tile is the only thing in the room that looks switched on. */
+    filter: saturate(0.18) brightness(0.5);
+    transition: filter 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  }
+  .tile .label {
+    font-size: clamp(16px, 1.55vw, 32px);
+    font-variation-settings: "wdth" 112, "wght" 700;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+  .tile.focused {
+    filter: none;
+    transform: scale(1.07);
+    z-index: 2;
+    box-shadow:
+      0 0 70px -12px var(--tint),
+      0 24px 48px -18px rgba(0, 0, 0, 0.9);
+  }
+
+  /* ---- footer ---- */
+  footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 3vw;
+    min-height: 5.5vh;
+  }
+  #note {
+    font-size: clamp(13px, 1.05vw, 21px);
+    font-variation-settings: "wdth" 100, "wght" 400;
+    color: var(--haze);
+    max-width: 62ch;
+    line-height: 1.45;
+  }
+  #keys {
+    display: flex;
+    gap: 1.6vw;
+    flex: none;
+    font-size: clamp(11px, 0.85vw, 17px);
+    color: var(--haze);
+    font-variation-settings: "wdth" 92, "wght" 500;
+  }
+  #keys b {
+    color: var(--chalk);
+    font-variation-settings: "wdth" 92, "wght" 700;
+    margin-right: 0.45em;
+  }
+
+  #fault {
+    font-size: clamp(13px, 1.05vw, 21px);
+    color: #FF7A6B;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transition: none; }
+    .tile.focused { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div id="shell">
+  <header>
+    <div id="clock">--:--</div>
+    <div id="date"></div>
+  </header>
+
+  <div id="grid" role="listbox" aria-label="Services"></div>
+
+  <footer>
+    <div id="note"></div>
+    <div id="keys">
+      <span><b>Arrows</b>move</span>
+      <span><b>OK</b>open</span>
+      <span><b>Back</b>close</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const grid = document.getElementById("grid");
+  const note = document.getElementById("note");
+  const clockEl = document.getElementById("clock");
+  const dateEl = document.getElementById("date");
+
+  let services = [];
+  let tiles = [];
+  let cursor = 0;
+
+  /* ---------- clock ---------- */
+  function tick() {
+    const now = new Date();
+    clockEl.textContent = now.toLocaleTimeString([], {
+      hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    dateEl.textContent = now.toLocaleDateString([], {
+      weekday: "long", day: "numeric", month: "long"
+    });
+  }
+  tick();
+  setInterval(tick, 15000);
+
+  /* ---------- rendering ---------- */
+  function columns() {
+    return getComputedStyle(grid).gridTemplateColumns.split(" ").length;
+  }
+
+  function paint() {
+    tiles.forEach((t, i) => {
+      const on = i === cursor;
+      t.classList.toggle("focused", on);
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+    });
+    const svc = services[cursor];
+    note.textContent = svc && svc.note ? svc.note : "";
+  }
+
+  function move(delta) {
+    if (!tiles.length) return;
+    const next = cursor + delta;
+    if (next < 0 || next >= tiles.length) return;
+    cursor = next;
+    paint();
+  }
+
+  function build(list) {
+    services = list;
+    grid.textContent = "";
+    tiles = list.map((svc, i) => {
+      const btn = document.createElement("button");
+      btn.className = "tile";
+      btn.style.setProperty("--tint", svc.color || "#2A3040");
+      btn.style.setProperty("--tint-ink", svc.ink || "#FFFFFF");
+      btn.setAttribute("role", "option");
+
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = svc.name;
+      btn.appendChild(label);
+
+      btn.addEventListener("click", () => { cursor = i; paint(); open(); });
+      btn.addEventListener("mouseenter", () => { cursor = i; paint(); });
+      grid.appendChild(btn);
+      return btn;
+    });
+    paint();
+  }
+
+  /* ---------- actions ---------- */
+  function post(path, body) {
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {})
+    }).then(r => r.json());
+  }
+
+  let busy = false;
+  function open() {
+    const svc = services[cursor];
+    if (!svc || busy) return;
+    busy = true;
+    post("/launch", { id: svc.id })
+      .then(res => {
+        if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
+      })
+      .catch(() => {
+        note.innerHTML = '<span id="fault">Launcher service is not responding.</span>';
+      })
+      .finally(() => { setTimeout(() => { busy = false; }, 800); });
+  }
+
+  function close() { post("/close").catch(() => {}); }
+
+  /* ---------- input ---------- */
+  document.addEventListener("keydown", e => {
+    const cols = columns();
+    switch (e.key) {
+      case "ArrowLeft":  move(-1); break;
+      case "ArrowRight": move(1); break;
+      case "ArrowUp":    move(-cols); break;
+      case "ArrowDown":  move(cols); break;
+      case "Enter":
+      case " ":          open(); break;
+      case "Escape":
+      case "Backspace":
+      case "Home":       close(); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  // Reveal the cursor only once a pointing device is actually used, so an
+  // air mouse works without leaving a stray arrow on screen the rest of the time.
+  window.addEventListener("mousemove", () => document.body.classList.add("pointer"), { once: true });
+
+  /* ---------- boot ---------- */
+  fetch("/services.json")
+    .then(r => r.json())
+    .then(build)
+    .catch(() => {
+      note.innerHTML = '<span id="fault">Could not read services.json. Check the launcher service.</span>';
+    });
+})();
+</script>
+</body>
+</html>

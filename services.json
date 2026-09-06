@@ -1,0 +1,130 @@
+[
+  {
+    "id": "netflix",
+    "name": "Netflix",
+    "url": "https://www.netflix.com/browse",
+    "color": "#E50914",
+    "ink": "#FFFFFF",
+    "note": "Works with libwidevinecdm0. Capped at SD-to-720p on Widevine L3."
+  },
+  {
+    "id": "prime",
+    "name": "Prime Video",
+    "url": "https://www.primevideo.com",
+    "color": "#00A8E1",
+    "ink": "#04202B",
+    "note": "Reliable on Linux Chromium. L3 resolution cap applies."
+  },
+  {
+    "id": "disneyplus",
+    "name": "Disney+",
+    "url": "https://www.disneyplus.com",
+    "color": "#113CCF",
+    "ink": "#FFFFFF",
+    "note": "Inconsistent on L3. Some titles refuse to start playback."
+  },
+  {
+    "id": "max",
+    "name": "Max",
+    "url": "https://play.max.com",
+    "color": "#002BE7",
+    "ink": "#FFFFFF",
+    "note": "Player is heavy. Expect slow catalog scrolling on the Pi."
+  },
+  {
+    "id": "hulu",
+    "name": "Hulu",
+    "url": "https://www.hulu.com/hub/home",
+    "color": "#1CE783",
+    "ink": "#062916",
+    "note": "Historically blocks Linux browsers. Needs a user_agent override to load."
+  },
+  {
+    "id": "paramount",
+    "name": "Paramount+",
+    "url": "https://www.paramountplus.com",
+    "color": "#0064FF",
+    "ink": "#FFFFFF",
+    "note": "Generally loads on Linux. Live TV feeds are the flaky part."
+  },
+  {
+    "id": "peacock",
+    "name": "Peacock",
+    "url": "https://www.peacocktv.com/watch/home",
+    "color": "#7A4DF5",
+    "ink": "#FFFFFF",
+    "note": "Loads on Linux. Heavy player, slow on first launch."
+  },
+  {
+    "id": "appletv",
+    "name": "Apple TV",
+    "url": "https://tv.apple.com",
+    "color": "#E8E8ED",
+    "ink": "#16161A",
+    "note": "Web player prefers Safari. Playback on Linux is unreliable."
+  },
+  {
+    "id": "youtube",
+    "name": "YouTube",
+    "url": "https://www.youtube.com/tv",
+    "color": "#FF0033",
+    "ink": "#FFFFFF",
+    "note": "Uses the TV interface, which is built for a d-pad. Best remote experience here."
+  },
+  {
+    "id": "plex",
+    "name": "Plex",
+    "url": "http://localhost:32400/web",
+    "color": "#E5A00D",
+    "ink": "#2A1D02",
+    "note": "Point this at your own server. No DRM, so no resolution cap."
+  },
+  {
+    "id": "jellyfin",
+    "name": "Jellyfin",
+    "url": "http://jellyfin.local:8096",
+    "color": "#AA5CC3",
+    "ink": "#FFFFFF",
+    "note": "Point this at your own server. No DRM, so no resolution cap."
+  },
+  {
+    "id": "tubi",
+    "name": "Tubi",
+    "url": "https://tubitv.com",
+    "color": "#6C1CD1",
+    "ink": "#FFFFFF",
+    "note": "Free and ad-supported. Light DRM, works well on Linux."
+  },
+  {
+    "id": "pluto",
+    "name": "Pluto TV",
+    "url": "https://pluto.tv",
+    "color": "#FFF200",
+    "ink": "#232000",
+    "note": "Free live channels. One of the more forgiving players on the Pi."
+  },
+  {
+    "id": "crunchyroll",
+    "name": "Crunchyroll",
+    "url": "https://www.crunchyroll.com",
+    "color": "#F47521",
+    "ink": "#2B1102",
+    "note": "Works on Linux. Subtitle rendering is CPU-light."
+  },
+  {
+    "id": "twitch",
+    "name": "Twitch",
+    "url": "https://www.twitch.tv",
+    "color": "#9146FF",
+    "ink": "#FFFFFF",
+    "note": "No DRM. Full resolution available, limited only by CPU decode."
+  },
+  {
+    "id": "spotify",
+    "name": "Spotify",
+    "url": "https://open.spotify.com",
+    "color": "#1DB954",
+    "ink": "#04250F",
+    "note": "Audio only, so no decode load. Good background option."
+  }
+]

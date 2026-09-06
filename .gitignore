@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.pyc
+
+# Local browser profiles, if you ever test the daemon on the workstation
+.local/
+profiles/
+shell/
