@@ -57,11 +57,17 @@ fi
 command -v chromium >/dev/null || die "chromium not on PATH after install"
 ok "chromium $(chromium --version 2>/dev/null | awk '{print $2}')"
 
-# The CDM ships at /opt/WidevineCdm, not under ~/.config/chromium.
-if [ -f /opt/WidevineCdm/_platform_specific/linux_arm64/libwidevinecdm.so ]; then
-  ok "Widevine CDM present at /opt/WidevineCdm"
+# Chromium loads its CDM from the browser profile, not from /opt, so checking
+# the package there proves nothing about whether DRM will work. What matters is
+# the seed directory: without it a new profile fails DRM once, downloads a CDM,
+# and only plays after it reopens.
+SEED="$HOME/.local/share/pilauncher/widevine"
+if [ -d "$SEED" ] && [ -n "$(ls -A "$SEED" 2>/dev/null)" ]; then
+  ok "Widevine seed present, new profiles get a CDM immediately"
 else
-  warn "Widevine CDM missing. DRM services will not present a player."
+  warn "no Widevine seed at $SEED"
+  warn "  a new service will fail DRM once, then work when reopened"
+  warn "  see the Widevine section in README.md to populate it"
 fi
 
 # ------------------------------------------------------------- systemd units

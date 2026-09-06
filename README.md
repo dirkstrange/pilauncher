@@ -60,19 +60,54 @@ mkdir -p ~/pilauncher
 chmod +x ~/pilauncher/launcher.py ~/pilauncher/back.sh
 ```
 
-`libwidevinecdm0` is the part that makes Netflix, Prime Video, and the rest
-load at all. Without it those sites will not present a player.
+## Widevine and DRM
 
-Verify the CDM registered:
+Netflix, Prime Video, Max and the rest need Widevine to present a player at
+all. This is worth understanding before anything else, because when it breaks
+the services blame themselves and you will debug the wrong layer for an hour.
+
+Chromium loads a Widevine CDM from the browser profile it was started with,
+under `<profile>/WidevineCdm`, found through a hint file that stores an
+absolute path. It does not use the system-wide CDM that the `libwidevinecdm0`
+package installs at `/opt/WidevineCdm`. That package is still worth having for
+other browsers, but Chromium ignores it.
+
+The CDM arrives on its own: Chromium's component updater downloads one per
+profile, in the background, on first run. The catch is that it only takes
+effect the next time that profile opens, so a brand new service fails DRM once
+and then works. `launcher.py` avoids that by seeding each new profile from
+`~/.local/share/pilauncher/widevine` if a copy is there. To populate that
+directory, copy `WidevineCdm` out of any profile that already has one, and
+leave the hint file behind:
 
 ```bash
-ls /opt/WidevineCdm/_platform_specific/linux_arm64/
-chromium --version
+cp -a ~/.local/share/pilauncher/profiles/netflix/WidevineCdm/.       ~/.local/share/pilauncher/widevine/
+rm -f ~/.local/share/pilauncher/widevine/latest-component-updated-widevine-cdm
 ```
 
-Then open `https://bitmovin.com/demos/drm` in Chromium and confirm the
-Widevine stream plays. Do this before touching the launcher; if DRM is broken,
-nothing downstream will work and you will waste time debugging the wrong layer.
+Copying a CDM between profiles by hand needs that hint file rewritten to the
+new absolute path, or the copy quietly points back at where it came from.
+
+To check whether a profile has a working CDM, ask Chromium rather than the
+streaming service:
+
+```bash
+chromium --headless=new --enable-logging=stderr --v=1   --user-data-dir=~/.local/share/pilauncher/profiles/netflix   about:blank 2>&1 | grep -i widevine
+```
+
+`Registering hinted Widevine 4.10.3057.0` means it is fine. `Widevine enabled
+but no library found` means there is no CDM in that profile. Netflix reports
+the second case as a message telling you to visit
+`chrome://settings/content/protectedContent` and enable protected content.
+That advice is a dead end; the setting is not the problem.
+
+For an end-to-end check, open `https://bitmovin.com/demos/drm` in Chromium and
+confirm the stream plays.
+
+Avoid `--disable-component-update`. It looks like a reasonable way to stop
+Chromium changing the CDM underneath you, and under Chromium 149 it genuinely
+fixed E100 playback failures. Under 152 it prevents a fresh profile from ever
+getting a CDM, which takes DRM out entirely.
 
 ## Run it by hand first
 
