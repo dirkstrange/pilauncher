@@ -82,10 +82,10 @@
   {
     "id": "jellyfin",
     "name": "Jellyfin",
-    "url": "http://jellyfin.local:8096",
+    "url": "http://192.168.1.10:30013",
     "color": "#AA5CC3",
     "ink": "#FFFFFF",
-    "note": "Point this at your own server. No DRM, so no resolution cap."
+    "note": "Local Jellyfin server. No DRM, so no resolution cap."
   },
   {
     "id": "tubi",

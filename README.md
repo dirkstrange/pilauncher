@@ -67,6 +67,7 @@ Two units: the daemon, and the launcher's own Chromium shell.
 [Unit]
 Description=pilauncher daemon
 After=graphical-session.target
+PartOf=graphical-session.target
 
 [Service]
 ExecStart=/usr/bin/python3 %h/pilauncher/launcher.py
@@ -84,6 +85,7 @@ WantedBy=default.target
 Description=pilauncher display shell
 After=pilauncher.service
 Requires=pilauncher.service
+PartOf=graphical-session.target
 
 [Service]
 ExecStartPre=/bin/sleep 3
@@ -109,18 +111,33 @@ loginctl enable-linger "$USER"   # so the units survive without an active login
 Kiosk windows swallow keystrokes, so the page cannot catch a "go home" key
 once a service is open. Bind it at the compositor instead.
 
-For labwc, in `~/.config/labwc/rc.xml` inside `<keyboard>`:
+For labwc the binding goes in `~/.config/labwc/rc.xml` inside `<keyboard>`.
+That file usually does not exist yet, and this is the part that catches people:
+a user `rc.xml` replaces the system defaults outright rather than layering on
+top of them. Writing a file containing only these two keybinds costs you
+Alt-Tab, the volume keys, and every other stock binding. Start from the system
+copy instead:
+
+```bash
+cp /etc/xdg/labwc/rc.xml ~/.config/labwc/rc.xml
+```
+
+Then add the keybinds inside the existing `<keyboard>` element. Use an absolute
+path; labwc does not expand `~` here, and the user is whoever runs the session,
+not necessarily `pi`:
 
 ```xml
 <keybind key="A-Escape">
-  <action name="Execute" command="/home/pi/pilauncher/back.sh" />
+  <action name="Execute" command="/home/YOUR_USER/pilauncher/back.sh" />
 </keybind>
 <keybind key="XF86HomePage">
-  <action name="Execute" command="/home/pi/pilauncher/back.sh" />
+  <action name="Execute" command="/home/YOUR_USER/pilauncher/back.sh" />
 </keybind>
 ```
 
-Then `labwc --reconfigure`. Confirm your compositor first:
+Reload with `labwc --reconfigure`. That command reads `LABWC_PID` from its own
+session, so it fails over SSH; from a remote shell send the signal directly
+with `kill -HUP $(pgrep -x labwc)`. Confirm your compositor first:
 
 ```bash
 echo "$XDG_SESSION_TYPE"
@@ -175,5 +192,5 @@ not a default you inherited.
   L1 is unreachable. Netflix runs SD to 720p depending on title.
 - The Pi 5 has no hardware H.264 decoder. Browser DRM streams fall to CPU
   decode. At 720p this is fine; there is not much headroom above it.
-- `plex` and `jellyfin` entries point at placeholder hosts. Edit them.
+- The `plex` entry still points at a placeholder host. Edit it or drop the tile.
 - Apple TV's web player is built around Safari and is unreliable here.
