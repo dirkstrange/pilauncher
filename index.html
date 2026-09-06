@@ -409,12 +409,12 @@
     tiles.forEach((t, i) => t.classList.toggle("moving", i === moving));
 
     const svc = services[cursor];
-    if (moving >= 0) {
-      note.textContent = "Moving " + svc.name +
-        ". Arrows place it, Enter keeps it, Escape puts it back.";
-    } else {
-      note.textContent = svc && svc.note ? svc.note : "";
-    }
+    // The per-service note stays in services.json as catalog documentation but
+    // is not shown; on a TV it was reading as clutter. The footer is still used
+    // for the move-mode hint and for errors.
+    note.textContent = moving >= 0
+      ? "Moving " + svc.name + ". Arrows place it, Enter keeps it, Escape puts it back."
+      : "";
 
     // Keyboard focus has to drag the viewport with it, otherwise rows past the
     // fold are selectable but never visible. "nearest" scrolls the minimum
