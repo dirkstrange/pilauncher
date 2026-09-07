@@ -93,15 +93,51 @@ say "Configuring labwc"
 
 mkdir -p "$LABWC_DIR"
 
-# A user rc.xml REPLACES the system defaults rather than extending them, so
-# start from the system copy or the session loses Alt-Tab and the volume keys.
-if [ ! -f "$LABWC_DIR/rc.xml" ]; then
-  if [ -f /etc/xdg/labwc/rc.xml ]; then
-    cp /etc/xdg/labwc/rc.xml "$LABWC_DIR/rc.xml"
-    ok "seeded rc.xml from /etc/xdg/labwc/rc.xml"
+# Whether a user rc.xml REPLACES the system one or is read IN ADDITION to it
+# depends on how labwc was started, and getting it wrong is visible either way.
+#
+# With -m (--merge-config), which is how Raspberry Pi OS starts it, both files
+# are read. Seeding the system copy into the user file then defines every stock
+# keybind twice and autostarts pcmanfm-pi, wf-panel-pi and kanshi twice, which
+# shows up as two stacked taskbars.
+#
+# Without -m the first file found wins, and a user file that holds only
+# additions costs the session its stock keybinds, the volume keys included.
+#
+# The man page describes the second case, so read the running process rather
+# than trusting the documentation.
+LABWC_PID=$(pgrep -x labwc 2>/dev/null | head -1 || true)
+MERGE_CONFIG=unknown
+if [ -n "$LABWC_PID" ] && [ -r "/proc/$LABWC_PID/cmdline" ]; then
+  if tr '\0' ' ' < "/proc/$LABWC_PID/cmdline" | grep -qE '(^| )(-m|--merge-config)( |$)'; then
+    MERGE_CONFIG=yes
   else
-    printf '<?xml version="1.0"?>\n<labwc_config>\n  <keyboard>\n  </keyboard>\n</labwc_config>\n' > "$LABWC_DIR/rc.xml"
-    warn "no system rc.xml found; wrote a minimal one"
+    MERGE_CONFIG=no
+  fi
+fi
+
+if [ ! -f "$LABWC_DIR/rc.xml" ]; then
+  if [ "$MERGE_CONFIG" = no ] && [ -f /etc/xdg/labwc/rc.xml ]; then
+    cp /etc/xdg/labwc/rc.xml "$LABWC_DIR/rc.xml"
+    ok "seeded rc.xml from /etc/xdg/labwc/rc.xml (labwc is not merging configs)"
+  else
+    cat > "$LABWC_DIR/rc.xml" <<'RCXML'
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <!-- labwc here runs with the merge-config option, so this file is read in
+       addition to /etc/xdg/labwc/rc.xml. Only pilauncher's own additions
+       belong here; copying the system file in defines every stock binding
+       twice and gives you two taskbars. -->
+  <keyboard>
+  </keyboard>
+</openbox_config>
+RCXML
+    if [ "$MERGE_CONFIG" = yes ]; then
+      ok "wrote a minimal rc.xml (labwc is merging configs, so this file only adds)"
+    else
+      warn "could not tell whether labwc merges configs; assumed it does"
+      warn "  if the stock keybinds stop working, seed $LABWC_DIR/rc.xml from /etc/xdg/labwc/rc.xml"
+    fi
   fi
 fi
 
