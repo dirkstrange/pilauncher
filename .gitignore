@@ -23,3 +23,8 @@ shell/
 # Predecessor LineageOS ROM, Magisk, gapps and widevine zips (~1GB). Kept for
 # reference, never part of the launcher.
 Lineage/
+
+# Sideloaded Android packages staged for Waydroid. Large, and not source.
+*.apk
+*.apkm
+*.xapk
