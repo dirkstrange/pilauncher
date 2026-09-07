@@ -402,14 +402,15 @@ def start_android(svc: dict) -> int:
     with _lock:
         _android = pkg
 
-    # Web services get a brand new Chromium window, which the compositor
-    # stacks above the tiles on its own. Android does not: its surface is
-    # mapped for the life of the waydroid session and already sits behind the
-    # tiles, so launching an app inside it changes nothing on screen. Nothing
-    # here can raise a window either, since labwc binds no cycling key. So the
-    # two take turns: dropping the launcher's own window leaves Android as the
-    # only fullscreen surface. /close puts the tiles back.
-    _shell_unit("stop")
+    # Nothing else to do. Waydroid maps a window only while an app is running,
+    # not for the whole session, so the app's window is new and the compositor
+    # raises it above the tiles the same way it does a Chromium service window.
+    #
+    # Worth stating because the obvious reading is wrong: the tiles do not have
+    # to be hidden to reveal Android. An earlier version stopped the launcher's
+    # own window here, which worked but cost a page reload on the way back and
+    # lost the highlighted tile every time. Confirmed on the TV that the app
+    # comes up in front with the tiles still running behind it.
     return 0
 
 
