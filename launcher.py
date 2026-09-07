@@ -10,6 +10,8 @@ Environment overrides:
     PILAUNCHER_PROFILES   profile root directory
     PILAUNCHER_PORT       listen port             (default: 8800)
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
+    PILAUNCHER_WAYDROID   waydroid binary         (default: waydroid)
+    PILAUNCHER_WAYDROID_STOP  root helper that stops an Android app
     PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
     PILAUNCHER_ORDER      saved tile order (default: alongside the profiles)
     PILAUNCHER_WALLPAPERS screensaver image folder
@@ -45,6 +47,14 @@ PROFILE_ROOT = Path(
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
+# Android services are launched through waydroid. Launching works as the
+# desktop user, but stopping an app needs "waydroid shell", which insists on
+# root, so that one step goes through a root-owned helper permitted by a
+# narrow sudoers rule. install.sh puts both in place.
+WAYDROID = os.environ.get("PILAUNCHER_WAYDROID", "waydroid")
+WAYDROID_STOP = os.environ.get(
+    "PILAUNCHER_WAYDROID_STOP", "/usr/local/sbin/pilauncher-waydroid-stop"
+)
 # A known-good Widevine CDM copied into each new profile. See seed_widevine().
 CDM_SEED = Path(os.environ.get("PILAUNCHER_CDM_SEED", PROFILE_ROOT.parent / "widevine"))
 # Tile order lives outside the repo. services.json is the catalog and is
@@ -103,6 +113,10 @@ COMMON_FLAGS = [
 ]
 
 _proc: subprocess.Popen | None = None
+# Package name of the Android app on screen, or None. Android has no process
+# of ours to hold on to: waydroid launches the app inside the container and
+# returns, so the package name is the only handle we get.
+_android: str | None = None
 _lock = threading.Lock()
 
 
@@ -293,28 +307,65 @@ def find_service(service_id: str) -> dict | None:
 
 
 def stop_current() -> bool:
-    """Terminate the running service window. Returns True if one was killed."""
-    global _proc
+    """Stop the running service. Returns True if there was one.
+
+    Deliberately says nothing about the launcher's own window. Callers decide
+    whether the tiles should come back, because /close wants them and
+    /desktop does not.
+    """
+    global _proc, _android
     with _lock:
         proc, _proc = _proc, None
-    if proc is None or proc.poll() is not None:
-        return False
-    try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
+        pkg, _android = _android, None
+
+    stopped = False
+
+    if pkg is not None:
+        # An Android app has to be stopped explicitly. Its surface is mapped
+        # for the whole waydroid session, so raising the tiles back over it
+        # would leave the app running and still playing audio underneath.
+        stop_android_app(pkg)
+        stopped = True
+
+    if proc is not None and proc.poll() is None:
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         except ProcessLookupError:
             pass
-    except ProcessLookupError:
-        pass
-    return True
+        stopped = True
+
+    return stopped
+
+
+def stop_android_app(pkg: str) -> bool:
+    """Force-stop one Android app through the root helper."""
+    try:
+        subprocess.run(
+            ["sudo", "-n", WAYDROID_STOP, pkg],
+            check=True,
+            timeout=30,
+            capture_output=True,
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        # Not fatal on its own. The caller still brings the tiles back, so the
+        # worst case is an app left running behind them rather than a box with
+        # no way out.
+        return False
 
 
 def start_service(svc: dict) -> int:
     global _proc
     stop_current()
+
+    if svc.get("kind") == "android":
+        return start_android(svc)
 
     profile = PROFILE_ROOT / svc["id"]
     profile.mkdir(parents=True, exist_ok=True)
@@ -332,6 +383,34 @@ def start_service(svc: dict) -> int:
     with _lock:
         _proc = proc
     return proc.pid
+
+
+def start_android(svc: dict) -> int:
+    """Bring an Android app to the screen.
+
+    Returns 0 rather than a pid. The app runs inside the waydroid container,
+    so there is no process here to report; the package name in _android is the
+    handle instead.
+    """
+    global _android
+    pkg = svc.get("package")
+    if not pkg:
+        raise ValueError(f"service {svc.get('id')!r} is kind=android with no package")
+
+    subprocess.run([WAYDROID, "app", "launch", pkg], check=True, timeout=60)
+
+    with _lock:
+        _android = pkg
+
+    # Web services get a brand new Chromium window, which the compositor
+    # stacks above the tiles on its own. Android does not: its surface is
+    # mapped for the life of the waydroid session and already sits behind the
+    # tiles, so launching an app inside it changes nothing on screen. Nothing
+    # here can raise a window either, since labwc binds no cycling key. So the
+    # two take turns: dropping the launcher's own window leaves Android as the
+    # only fullscreen surface. /close puts the tiles back.
+    _shell_unit("stop")
+    return 0
 
 
 def seed_widevine(profile: Path) -> None:
@@ -362,6 +441,24 @@ def seed_widevine(profile: Path) -> None:
         pass
 
 
+def _shell_unit(action: str) -> bool:
+    """start or stop the launcher's own window, without touching services."""
+    try:
+        subprocess.run(
+            ["systemctl", "--user", action, SHELL_UNIT],
+            check=True,
+            timeout=30,
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def start_shell() -> bool:
+    """Put the tiles back. A no-op if the window is already up."""
+    return _shell_unit("start")
+
+
 def stop_shell() -> bool:
     """Stop the launcher's own Chromium window, revealing the Pi desktop.
 
@@ -370,19 +467,17 @@ def stop_shell() -> bool:
     shell again rather than the whole stack.
     """
     stop_current()
-    try:
-        subprocess.run(
-            ["systemctl", "--user", "stop", SHELL_UNIT],
-            check=True,
-            timeout=15,
-        )
-        return True
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
-        return False
+    return _shell_unit("stop")
 
 
 def service_running() -> bool:
     with _lock:
+        # An Android app counts as running even though we hold no process for
+        # it. The tile page polls this to decide whether to arm the
+        # screensaver, and a show playing in the container is exactly the case
+        # where elapsed time alone must not trip it.
+        if _android is not None:
+            return True
         return _proc is not None and _proc.poll() is None
 
 
@@ -482,12 +577,28 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 pid = start_service(svc)
-            except FileNotFoundError:
-                self._json(500, {"error": f"{BROWSER} not found on PATH"})
+            except FileNotFoundError as exc:
+                missing = WAYDROID if svc.get("kind") == "android" else BROWSER
+                self._json(500, {"error": f"{missing} not found on PATH ({exc})"})
+                return
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+                # The launcher's own window is still up in this case, since
+                # start_android only drops it once the app has started, so the
+                # tiles show the error rather than a bare desktop.
+                self._json(500, {"error": f"could not launch {svc['id']}: {exc}"})
                 return
             self._json(200, {"launched": svc["id"], "pid": pid})
         elif path == "/close":
-            self._json(200, {"closed": stop_current()})
+            closed = stop_current()
+            # Unconditional, not just for Android. Starting a unit that is
+            # already running is a no-op, and the alternative is tracking
+            # whether the window was dropped, which strands the user on the
+            # bare desktop the first time that bookkeeping is wrong.
+            start_shell()
+            self._json(200, {"closed": closed})
         elif path == "/order":
             ids = payload.get("ids")
             if not isinstance(ids, list) or not all(isinstance(i, str) for i in ids):

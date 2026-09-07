@@ -75,10 +75,11 @@
   {
     "id": "youtube",
     "name": "YouTube",
-    "url": "https://www.youtube.com/tv",
+    "kind": "android",
+    "package": "com.google.android.youtube.tv",
     "color": "#FF0033",
     "ink": "#0F0F0F",
-    "note": "Uses the TV interface, which is built for a d-pad. Best remote experience here.",
+    "note": "Sideloaded Android TV app, not the web player. Real d-pad navigation. To go back to the web version, drop kind and package and set url to https://www.youtube.com/tv",
     "tile_bg": "#FFFFFF"
   },
   {

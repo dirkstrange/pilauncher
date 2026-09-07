@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# Force-stop one Android app in the Waydroid container.
+#
+# "waydroid shell" refuses to run as anyone but root, and pilauncher runs as
+# the desktop user, so this exists to be the single thing that user is allowed
+# to run as root. install.sh copies it to /usr/local/sbin owned by root and
+# writes a sudoers rule naming this path and nothing else.
+#
+# It lives outside the repo checkout on purpose. A NOPASSWD rule pointing at a
+# file the invoking user can edit is a rule to run anything as root.
+#
+# The package-name check is the whole point of the wrapper. Without it the
+# argument would reach a root shell, and "am force-stop" would be a foothold
+# for arbitrary commands. Android package names are dot-separated
+# alphanumerics, so anything outside that set is refused rather than escaped.
+
+set -euo pipefail
+
+pkg="${1:-}"
+
+if [ "$#" -ne 1 ]; then
+    echo "usage: $(basename "$0") <android.package.name>" >&2
+    exit 2
+fi
+
+case "$pkg" in
+    "" | *[!a-zA-Z0-9._]* )
+        echo "refusing package name with unexpected characters: $pkg" >&2
+        exit 2
+        ;;
+    .* | *.. )
+        echo "refusing suspicious package name: $pkg" >&2
+        exit 2
+        ;;
+esac
+
+exec waydroid shell -- am force-stop "$pkg"

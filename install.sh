@@ -193,6 +193,29 @@ ok "$COUNT tiles being served"
 # plain pilauncher box does not get a unit that fails on every boot.
 if command -v waydroid >/dev/null 2>&1 && [ -f /var/lib/waydroid/waydroid.cfg ]; then
   say "Enabling the Android session"
+
+  # Stopping an Android app needs "waydroid shell", which is root only. Rather
+  # than give the daemon blanket sudo, install one small root-owned helper and
+  # allow exactly that path. Kept out of the checkout deliberately: a NOPASSWD
+  # rule pointing into a user-writable directory is a rule to run anything.
+  HELPER=/usr/local/sbin/pilauncher-waydroid-stop
+  sudo install -o root -g root -m 0755 "$HERE/scripts/pilauncher-waydroid-stop" "$HELPER"
+  ok "installed $HELPER"
+
+  SUDOERS=/etc/sudoers.d/pilauncher
+  # Write via a temp file and check it before installing. A malformed file in
+  # sudoers.d breaks sudo for everything, including the sudo needed to fix it.
+  TMP_SUDOERS=$(mktemp)
+  printf '%s ALL=(root) NOPASSWD: %s\n' "$USER" "$HELPER" > "$TMP_SUDOERS"
+  if sudo visudo -cf "$TMP_SUDOERS" >/dev/null 2>&1; then
+    sudo install -o root -g root -m 0440 "$TMP_SUDOERS" "$SUDOERS"
+    ok "sudoers rule for $HELPER"
+  else
+    warn "generated sudoers rule failed validation; not installing it"
+    warn "  Android tiles will launch but will not be able to close"
+  fi
+  rm -f "$TMP_SUDOERS"
+
   systemctl --user enable waydroid-session.service
   systemctl --user restart waydroid-session.service
   # First boot of Android takes a while; later starts are quicker.
