@@ -41,6 +41,24 @@ TEMPLATE = """    {begin}
     {end}
 """
 
+# Window rules live outside <keyboard>, so they go in as their own block. The
+# same markers are used and the removal below is a global substitution, so a
+# re-run replaces both.
+WINDOW_RULES = """  {begin}
+  <!-- Waydroid sizes its window to whatever the taskbar leaves free, so an
+       Android app opens short of the screen and the panel sits on top of it.
+       Chromium asks for real fullscreen in kiosk mode, which is why the tiles
+       cover the panel; nothing on the Android side ever makes that request, so
+       it is made here instead. Matches every waydroid window, since some apps
+       map more than one and the extra would otherwise show through. -->
+  <windowRules>
+    <windowRule identifier="waydroid.*" matchOnce="false">
+      <action name="ToggleFullscreen" />
+    </windowRule>
+  </windowRules>
+  {end}
+"""
+
 
 def main() -> int:
     if len(sys.argv) != 3:
@@ -68,6 +86,27 @@ def main() -> int:
     block = TEMPLATE.format(begin=BEGIN, end=END, here=here)
     idx = text.index(marker) + len(marker)
     updated = text[:idx] + block + text[idx:]
+
+    # Window rules are a sibling of <keyboard>, not a child, so they cannot go
+    # in the block above. Append them just inside the root element.
+    #
+    # The root is <openbox_config> on Raspberry Pi OS, which labwc accepts for
+    # Openbox compatibility, but install.sh's own fallback writes
+    # <labwc_config>. Both are valid, so accept either rather than assuming.
+    closing = next(
+        (tag for tag in ("</openbox_config>", "</labwc_config>") if tag in updated),
+        None,
+    )
+    if closing is None:
+        print(
+            "no </openbox_config> or </labwc_config> in rc.xml; "
+            "add the window rules by hand",
+            file=sys.stderr,
+        )
+        return 1
+    rules = WINDOW_RULES.format(begin=BEGIN, end=END)
+    at = updated.rindex(closing)
+    updated = updated[:at] + rules + updated[at:]
 
     # Parse before writing. A malformed rc.xml costs the whole session's
     # keybinds, and labwc reports it only to a log nobody is watching.

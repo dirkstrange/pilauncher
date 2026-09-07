@@ -107,12 +107,14 @@ fi
 
 # The block is delimited so a re-run can replace it wholesale. Checking only
 # for presence would leave an older install without keybinds added later.
-if grep -q 'pilauncher:end' "$LABWC_DIR/rc.xml" && grep -q 'desktop.sh' "$LABWC_DIR/rc.xml"; then
-  ok "keybinds already current"
+if grep -q 'pilauncher:end' "$LABWC_DIR/rc.xml" \
+  && grep -q 'desktop.sh' "$LABWC_DIR/rc.xml" \
+  && grep -q 'windowRule identifier="waydroid' "$LABWC_DIR/rc.xml"; then
+  ok "keybinds and window rules already current"
 else
   cp "$LABWC_DIR/rc.xml" "$LABWC_DIR/rc.xml.bak.$(date +%Y%m%d%H%M%S)"
   python3 "$HERE/scripts/labwc_keybinds.py" "$LABWC_DIR/rc.xml" "$HERE" || die "could not add keybinds; the .bak beside rc.xml is your original"
-  ok "keybinds added (Alt+Escape, Home, Alt+F4, Ctrl+Alt+D)"
+  ok "keybinds added (Alt+Escape, Home, Alt+F4, Ctrl+Alt+D) and the waydroid fullscreen rule"
 fi
 
 # Stop the display blanking mid-film.
