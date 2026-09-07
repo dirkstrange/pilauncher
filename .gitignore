@@ -19,6 +19,11 @@ shell/
 *.jpg
 *.jpeg
 
+# Not every image here is a stray, though. pimedia-splash-source.png is DJ's
+# own "Pi Media by StrangeCraft" artwork, the source for the custom page on the
+# Pironman case OLED. It is deliberately kept and deliberately untracked, so do
+# not delete it as clutter. Being ignored, git is NOT a backup of it.
+
 
 # Predecessor LineageOS ROM, Magisk, gapps and widevine zips (~1GB). Kept for
 # reference, never part of the launcher.
