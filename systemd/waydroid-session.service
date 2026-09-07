@@ -1,0 +1,27 @@
+[Unit]
+Description=Waydroid session (Android apps for pilauncher)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+# Same race as pilauncher.service: the compositor publishes WAYLAND_DISPLAY to
+# the systemd user environment a moment after it starts, and this unit can win
+# it. Waydroid presents Android as a Wayland client, so with no display it
+# starts, reports "Android with user 0 is ready", and draws nothing at all.
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_SESSION_TYPE=wayland
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ] && exit 0; sleep 1; done; echo "wayland socket never appeared" >&2; exit 1'
+# waydroid-container is a system service, and a user unit cannot order itself
+# against one, so wait for it rather than assume it is up. It holds the binder
+# mounts and the Android rootfs; the session is only the display half.
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 60); do systemctl is-active --quiet waydroid-container && exit 0; sleep 1; done; echo "waydroid-container never became active" >&2; exit 1'
+ExecStart=/usr/bin/waydroid session start
+ExecStop=/usr/bin/waydroid session stop
+# Both ExecStartPre loops count against the start timeout, so allow for the
+# worst case of 90s of waiting plus Android's own first boot.
+TimeoutStartSec=240
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

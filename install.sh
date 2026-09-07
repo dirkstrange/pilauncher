@@ -74,7 +74,7 @@ fi
 say "Installing systemd user units"
 
 mkdir -p "$UNIT_DIR"
-for unit in pilauncher.service pilauncher-shell.service; do
+for unit in pilauncher.service pilauncher-shell.service waydroid-session.service; do
   sed -e "s|__PILAUNCHER_DIR__|$HERE|g" \
       -e "s|__PILAUNCHER_PORT__|$PORT|g" \
       "$HERE/systemd/$unit" > "$UNIT_DIR/$unit"
@@ -186,6 +186,27 @@ done
 
 COUNT=$(curl -fsS "http://127.0.0.1:$PORT/services.json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
 ok "$COUNT tiles being served"
+
+# ------------------------------------------------------------------- waydroid
+# Android apps are optional. The unit file is written either way above, but it
+# is only enabled where waydroid is actually installed and initialised, so a
+# plain pilauncher box does not get a unit that fails on every boot.
+if command -v waydroid >/dev/null 2>&1 && [ -f /var/lib/waydroid/waydroid.cfg ]; then
+  say "Enabling the Android session"
+  systemctl --user enable waydroid-session.service
+  systemctl --user restart waydroid-session.service
+  # First boot of Android takes a while; later starts are quicker.
+  for i in $(seq 1 40); do
+    if waydroid status 2>/dev/null | grep -q "Session:.*RUNNING"; then
+      ok "Android session running"
+      break
+    fi
+    [ "$i" -eq 40 ] && warn "Android session did not report RUNNING; check: journalctl --user -u waydroid-session.service"
+    sleep 3
+  done
+else
+  say "Skipping the Android session (waydroid not installed or not initialised)"
+fi
 
 say "Done"
 cat <<EOM
