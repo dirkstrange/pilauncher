@@ -11,10 +11,15 @@
   :root {
     /* Strange Media tokens, copied from design/brand.css. That folder is the
        source of truth for the mark and the palette, so a change there wants
-       making here too. The page is darker than it was, which also buys the
-       focus ring the contrast it wants. */
-    --ink:        #0C0F15;
-    --ink-raised: #161A22;
+       making here too.
+
+       One deliberate departure: the page uses the kit's surface value rather
+       than its page value. On a sheet the darkest ground looks best, but the
+       content here is tiles, and the darkest of those were disappearing into
+       a page that matched them. Everything sits one step up so a black tile
+       still reads as a tile. */
+    --ink:        #161A22;
+    --ink-raised: #212734;
     --chalk:      #F2F4F8;
     --haze:       rgba(242, 244, 248, 0.45);
     --cyan:       #23C9F2;
