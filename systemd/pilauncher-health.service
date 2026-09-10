@@ -1,0 +1,15 @@
+[Unit]
+Description=pilauncher session health check
+# Not PartOf=graphical-session.target. The check is worth running even when the
+# compositor is being restarted, and a unit that is torn down with the session
+# cannot repair the thing that broke while the session was coming up.
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+# XDG_RUNTIME_DIR arrives automatically in a user unit, which is all wpctl
+# needs to find the PipeWire socket.
+ExecStart=/usr/bin/python3 __PILAUNCHER_DIR__/scripts/pilauncher-health.py
+# The script exits 0 whether or not it repaired anything, so a non-zero status
+# here means the script itself broke and is worth seeing in the journal.
+TimeoutStartSec=120

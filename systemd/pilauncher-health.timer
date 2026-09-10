@@ -1,0 +1,22 @@
+[Unit]
+Description=Run the pilauncher health check every minute
+
+[Timer]
+# OnStartupSec rather than OnBootSec: this is a user unit, and the user manager
+# starts at login rather than at boot, so boot-relative timing would fire the
+# first check before the session it is meant to inspect exists.
+#
+# Ninety seconds in is deliberate. PipeWire, the compositor and Waydroid are
+# all still settling before that, and a check that runs during the startup it
+# is supposed to judge only produces false alarms.
+OnStartupSec=90
+OnUnitActiveSec=60
+# The point of the check is that the TV can be switched on at any time, long
+# after boot, and sound has to come back without anyone thinking about it. A
+# minute is the worst case for that. Waking a Pi once a minute to run a script
+# that usually makes one subprocess call is not worth optimising.
+AccuracySec=15
+Persistent=false
+
+[Install]
+WantedBy=timers.target

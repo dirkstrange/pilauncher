@@ -97,6 +97,11 @@ WAYDROID = os.environ.get("PILAUNCHER_WAYDROID", "waydroid")
 WAYDROID_STOP = os.environ.get(
     "PILAUNCHER_WAYDROID_STOP", "/usr/local/sbin/pilauncher-waydroid-stop"
 )
+WAYDROID_UNIT = os.environ.get("PILAUNCHER_WAYDROID_UNIT", "waydroid-session.service")
+# What waydroid prints when a binder transaction fails in transport. It is not
+# an error the CLI reports any other way: the exit status is 0 and the app
+# simply never appears. See start_android().
+WAYDROID_DEAD = "Sending reply failed"
 # A known-good Widevine CDM copied into each new profile. See seed_widevine().
 CDM_SEED = Path(os.environ.get("PILAUNCHER_CDM_SEED", PROFILE_ROOT.parent / "widevine"))
 # Tile order lives outside the repo. services.json is the catalog and is
@@ -657,6 +662,30 @@ def stop_current() -> bool:
     return stopped
 
 
+def clear_active_app() -> None:
+    """Tell waydroid that nothing is on screen any more.
+
+    waydroid writes the package into waydroid.active_apps on every launch and
+    never writes anything back when the app stops, so after a stop the property
+    still names an app that is gone. An empty value is the state a freshly
+    started session is in before anything has been launched, which is exactly
+    the state we are trying to get back to.
+
+    Best effort, and deliberately not checked. A stale value puts nothing on
+    screen by itself, because the app it names is not running, and the next
+    launch overwrites it regardless.
+    """
+    try:
+        subprocess.run(
+            [WAYDROID, "prop", "set", "waydroid.active_apps", ""],
+            check=False,
+            timeout=20,
+            capture_output=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 def stop_android_app(pkg: str) -> bool:
     """Force-stop one Android app through the root helper."""
     try:
@@ -666,12 +695,17 @@ def stop_android_app(pkg: str) -> bool:
             timeout=30,
             capture_output=True,
         )
-        return True
+        stopped = True
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         # Not fatal on its own. The caller still brings the tiles back, so the
         # worst case is an app left running behind them rather than a box with
         # no way out.
-        return False
+        stopped = False
+
+    # Whether or not the force-stop landed, the launcher's position is that no
+    # Android app should be on screen now, so say so.
+    clear_active_app()
+    return stopped
 
 
 def start_service(svc: dict) -> int:
@@ -699,19 +733,89 @@ def start_service(svc: dict) -> int:
     return proc.pid
 
 
+def android_ready(timeout: int = 120) -> bool:
+    """Wait until Android can actually answer, rather than merely be running.
+
+    "waydroid status" reports Session RUNNING within a second of the unit
+    starting and roughly half a minute before Android has finished booting, so
+    it is useless as a readiness test and actively misleading as a health test.
+    sys.boot_completed is set by Android itself at the end of its own startup.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            out = subprocess.run(
+                [WAYDROID, "prop", "get", "sys.boot_completed"],
+                capture_output=True, text=True, timeout=20, check=False,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            out = ""
+        if out == "1":
+            return True
+        time.sleep(2)
+    return False
+
+
+def restart_android_session() -> bool:
+    """Restart the waydroid session unit and wait for Android to come back."""
+    try:
+        subprocess.run(
+            ["systemctl", "--user", "restart", WAYDROID_UNIT],
+            check=True, timeout=300, capture_output=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return android_ready()
+
+
+def _ask_android_to_open(pkg: str) -> str:
+    """Ask waydroid to open a package, returning everything it said."""
+    proc = subprocess.run(
+        [WAYDROID, "app", "launch", pkg],
+        check=True, timeout=60, capture_output=True, text=True,
+    )
+    return (proc.stdout or "") + (proc.stderr or "")
+
+
 def start_android(svc: dict) -> int:
     """Bring an Android app to the screen.
 
     Returns 0 rather than a pid. The app runs inside the waydroid container,
     so there is no process here to report; the package name in _android is the
     handle instead.
+
+    Retries once through a session restart, because waydroid reaches a state
+    where the session and the container both report RUNNING, listing apps and
+    reading properties both work, and only the call that opens an app fails.
+    It fails in the least helpful way available: one line on stderr, exit
+    status 0, and no window. From the sofa that is indistinguishable from the
+    OK button having stopped working, which is exactly how it was reported.
+
+    Repairing it here rather than from a timer is deliberate. There is no way
+    to test for the condition without launching something, and a health check
+    that throws an app over whatever is playing every minute would be worse
+    than the fault. The launch is the one moment the answer matters and the one
+    moment a window is wanted anyway.
     """
     global _android
     pkg = svc.get("package")
     if not pkg:
         raise ValueError(f"service {svc.get('id')!r} is kind=android with no package")
 
-    subprocess.run([WAYDROID, "app", "launch", pkg], check=True, timeout=60)
+    said = _ask_android_to_open(pkg)
+    if WAYDROID_DEAD in said:
+        print(f"android: {pkg} did not open ({WAYDROID_DEAD}). Restarting the session.")
+        if not restart_android_session():
+            raise RuntimeError(
+                "the Android session would not come back. Check: "
+                f"systemctl --user status {WAYDROID_UNIT}"
+            )
+        said = _ask_android_to_open(pkg)
+        if WAYDROID_DEAD in said:
+            raise RuntimeError(
+                f"Android would not open {pkg} even after restarting the session"
+            )
+        print(f"android: session restarted, {pkg} opened on the retry")
 
     with _lock:
         _android = pkg
@@ -948,6 +1052,13 @@ class Handler(BaseHTTPRequestHandler):
                 # start_android only drops it once the app has started, so the
                 # tiles show the error rather than a bare desktop.
                 self._json(500, {"error": f"could not launch {svc['id']}: {exc}"})
+                return
+            except RuntimeError as exc:
+                # Android refused to open the app and would not be talked round
+                # by a session restart either. Worth its own message: the tile
+                # is fine, the catalog is fine, and the thing to look at is the
+                # container.
+                self._json(500, {"error": str(exc)})
                 return
             self._json(200, {"launched": svc["id"], "pid": pid})
         elif path == "/close":

@@ -541,6 +541,98 @@ stacked taskbars on the desktop is what that looks like.
 
 Also disable the desktop screensaver in `raspi-config` under Display Options.
 
+## What a boot with the TV off breaks
+
+A television is not a monitor. It gets switched off, it gets switched to the
+console input, and the Pi underneath it carries on regardless. Two things on
+this box ask the display a question exactly once, early, and never ask again,
+so booting while the TV is asleep leaves them holding a wrong answer for the
+rest of the session. Both failures look like something else entirely.
+
+### No sound at all
+
+PipeWire probes each HDMI port as it starts. A TV that is off cannot answer, so
+WirePlumber concludes there is no usable output, parks both HDMI cards at
+profile `off`, and makes a Dummy Output the default sink. That sink accepts
+audio and discards it, which is why everything keeps playing with the picture
+intact and nothing comes out of the speakers. Turning the TV on afterwards
+changes nothing, because the question is not asked twice.
+
+`wpctl status` is the tell. A healthy box lists `Built-in Audio Digital Stereo
+(HDMI)`; a broken one lists `Dummy Output` and nothing else.
+
+`scripts/pilauncher-health.py` repairs it by restarting WirePlumber, and
+`pilauncher-health.timer` runs it every minute so the sound comes back a minute
+after the TV wakes up rather than at the next reboot. It checks that an HDMI
+connector actually reports a display before doing anything, because silence is
+the correct behaviour for a Pi with nothing plugged into it, and it holds a ten
+minute cooldown so a repair that does not take is visible in the journal
+instead of being hammered once a minute.
+
+Three things bite when investigating this by hand:
+
+`aplay -D hw:1,0` fails with "Sample format non available" on a perfectly
+healthy card. vc4-hdmi only accepts `IEC958_SUBFRAME_LE` and ALSA converts
+through the plug layer, so `plughw:1,0` is the device to test with. The raw
+failure is not evidence of a passthrough mode or a fault.
+
+The ELD of a DISCONNECTED HDMI port still reports the last monitor it saw, so
+both ports can name the same television while only one is live.
+`/sys/class/drm/card*-HDMI-A-*/status` is the honest answer.
+
+A card parked at `off` does not merely have its stereo profile deselected: the
+profile is not in the list at all, leaving only `off` and `pro-audio`. That
+looks like a driver or hardware problem and is not one. Restarting WirePlumber
+with the TV awake rebuilds the list.
+
+### The wrong resolution, which then breaks other things
+
+`~/.config/kanshi/config` forces 1920x1080@60, because the TV offers 4K only at
+30Hz and nothing here renders above 1080p anyway. kanshi matches a profile by
+output name and silently ignores one whose outputs are not all connected, so a
+profile naming `HDMI-A-1` stops applying the moment the cable moves to the
+other port. Nothing warns. The desktop simply comes up at the TV's preferred
+mode.
+
+That single change cascades. Half the refresh rate. Waydroid draws Android app
+windows at 1080p in the middle of a 4K screen, since the Android session sizes
+itself once at startup. And the mode change is enough to make the HDMI audio
+probe above fail as well, so it presents as three unrelated faults at once.
+
+The config therefore carries one profile per port, `tv` and `tv2`, both forcing
+the same mode. An unmatched profile is inert rather than an error, so naming
+both costs nothing and means the cable can move.
+
+## When Android will not open anything
+
+Waydroid reaches a state where `waydroid status` reports Session RUNNING and
+Container RUNNING, `waydroid app list` returns the full list, `waydroid prop
+get` and `set` both work, and every single `waydroid app launch` fails. It
+fails in the least useful way available: one line of `Sending reply failed` on
+stderr, exit status 0, and no window. Web tiles keep working, so from the sofa
+it reads as the OK button having stopped working on some tiles but not others.
+
+That message comes from `tools/interfaces/IPlatform.py` and means the gbinder
+transaction failed in transport. It is not "no such app".
+
+The repair is `systemctl --user restart waydroid-session.service`, then waiting
+for Android to finish booting, which takes around 25 seconds. `waydroid status`
+says RUNNING almost immediately and is useless as a readiness test; the
+property `sys.boot_completed` reading `1` is the real signal.
+
+`start_android()` in `launcher.py` does this automatically now. It reads what
+waydroid printed, and on that specific string it restarts the session, waits
+for `sys.boot_completed`, and tries the launch once more before giving up and
+returning an error the tile page can show.
+
+This is repaired at the launch rather than from the health timer on purpose.
+There is no way to test for the condition without launching an app, and a check
+that threw a window over whatever was playing every minute would be worse than
+the fault it was looking for. The launch is the one moment the answer matters
+and the one moment a window is wanted anyway.
+
+Logcat shows nothing during any of this, so it is not worth reading.
+
 ## Editing the catalog
 
 The gear in the corner covers all of this now, and validates as it goes. What

@@ -74,7 +74,8 @@ fi
 say "Installing systemd user units"
 
 mkdir -p "$UNIT_DIR"
-for unit in pilauncher.service pilauncher-shell.service waydroid-session.service; do
+for unit in pilauncher.service pilauncher-shell.service waydroid-session.service \
+            pilauncher-health.service pilauncher-health.timer; do
   sed -e "s|__PILAUNCHER_DIR__|$HERE|g" \
       -e "s|__PILAUNCHER_PORT__|$PORT|g" \
       "$HERE/systemd/$unit" > "$UNIT_DIR/$unit"
@@ -223,7 +224,8 @@ update-desktop-database "$APPS" >/dev/null 2>&1 || true
 # ---------------------------------------------------------------- start up
 say "Starting services"
 
-chmod +x "$HERE/launcher.py" "$HERE/back.sh" "$HERE/desktop.sh" 2>/dev/null || true
+chmod +x "$HERE/launcher.py" "$HERE/back.sh" "$HERE/desktop.sh" \
+         "$HERE/scripts/pilauncher-health.py" 2>/dev/null || true
 systemctl --user enable pilauncher.service pilauncher-shell.service
 
 # Restart rather than start. On a re-run after a git pull the units are already
@@ -242,6 +244,20 @@ done
 
 COUNT=$(curl -fsS "http://127.0.0.1:$PORT/services.json" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')
 ok "$COUNT tiles being served"
+
+# ------------------------------------------------------------------- health
+# The Pi asks each HDMI port what it can do once, while PipeWire starts. Boot
+# with the TV off or on another input and it decides there is no sound card at
+# all, then never asks again, so the box comes up silent and stays silent. The
+# timer notices and repairs it a minute after the TV wakes up.
+say "Enabling the health check"
+systemctl --user enable pilauncher-health.timer
+systemctl --user restart pilauncher-health.timer
+if systemctl --user is-active --quiet pilauncher-health.timer; then
+  ok "health check running every minute"
+else
+  warn "health check timer did not start; check: systemctl --user status pilauncher-health.timer"
+fi
 
 # ------------------------------------------------------------------- waydroid
 # Android apps are optional. The unit file is written either way above, but it
