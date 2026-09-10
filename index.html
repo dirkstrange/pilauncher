@@ -156,7 +156,13 @@
   /* ---- grid ---- */
   #grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    /* Six across. Four gave 443x277 tiles on a 1080p screen, which is about
+       ten inches of a 55 inch set for a single logo, and fitted only eight of
+       nineteen services on screen at once. The rest of the catalog was a
+       scroll away, which reads as disorganised long before it reads as big.
+       Six fits the whole catalog and is still far above what is legible from
+       a sofa. */
+    grid-template-columns: repeat(6, 1fr);
     gap: var(--gap);
     /* "safe" keeps the rows centred while they fit, but falls back to
        start-alignment once they overflow. Plain "center" pushes the first row
@@ -183,8 +189,10 @@
     scrollbar-width: none;
   }
   #grid::-webkit-scrollbar { display: none; }
-  @media (max-width: 1100px) { #grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 700px)  { #grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 1500px) { #grid { grid-template-columns: repeat(5, 1fr); } }
+  @media (max-width: 1200px) { #grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 900px)  { #grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 640px)  { #grid { grid-template-columns: repeat(2, 1fr); } }
 
   .tile {
     position: relative;
@@ -234,7 +242,7 @@
   .tile.focused .label,
   .tile.focused .logo { opacity: 1; }
   .tile .label {
-    font-size: clamp(20px, 2.6vw, 46px);
+    font-size: clamp(15px, 1.7vw, 32px);
     font-variation-settings: "wdth" 108, "wght" 700;
     letter-spacing: -0.02em;
     line-height: 1.05;
@@ -320,20 +328,6 @@
     max-width: 62ch;
     line-height: 1.45;
   }
-  #keys {
-    display: flex;
-    gap: 1.6vw;
-    flex: none;
-    font-size: clamp(11px, 0.85vw, 17px);
-    color: var(--haze);
-    font-variation-settings: "wdth" 92, "wght" 500;
-  }
-  #keys b {
-    color: var(--chalk);
-    font-variation-settings: "wdth" 92, "wght" 700;
-    margin-right: 0.45em;
-  }
-
   /* ---- screensaver ---- */
   #saver {
     position: fixed;
@@ -427,14 +421,11 @@
 
   <div id="grid" role="listbox" aria-label="Services"></div>
 
+  <!-- The footer carries messages only. A legend of what the arrows and OK
+       do was here and has gone: a grid of tiles on a television is the one
+       interface nobody needs told how to drive. -->
   <footer>
     <div id="note"></div>
-    <div id="keys">
-      <span><b>Arrows</b>move</span>
-      <span><b>OK</b>open</span>
-      <span><b>Back</b>close</span>
-      <span><b>Hold OK</b>rearrange</span>
-    </div>
   </footer>
 </div>
 
