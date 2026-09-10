@@ -405,15 +405,15 @@ you clicked was never the color you got.
 Three ways in when none of the sixteen is right: click the logo in the preview
 to take the exact pixel under the pointer, choose From logo, which appears in
 that dropdown once a logo has given up some colors and holds those rather than
-mixing them into the other boards, or press "Pick a color off the screen"
-where Chromium offers that.
+mixing them into the other boards, or press "Pick from screen" where
+Chromium offers that API, which not every browser does.
 
-Two previews sit beside the board, drawn as the launcher draws a tile: the
-same 16/10, the same corner radius, the same logo sizing, and the same
-`saturate(0.92) brightness(0.9)` recede on the one that is not selected. A
-color that works lit is not always the one that works dim, and the grid is
-mostly dim. Those rules are a hand-kept copy of the ones in `index.html`,
-which is the price of previewing one page inside another.
+The preview beside the board is drawn the way the launcher draws a tile:
+the same 16/9, the same corner radius, the same logo sizing and the same
+shadow. It stretches to whatever height the color column comes to, so the
+two finish level. Those rules are a hand-kept copy of the ones in
+`index.html`, which is the price of previewing one page inside another and
+has already caught this preview out twice.
 
 The label color follows from how light the face is, and the glow the launcher
 draws around a focused tile keeps whatever brand color the entry already had.

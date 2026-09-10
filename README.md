@@ -46,9 +46,9 @@ way back to the Pi desktop.
 
 ![The settings page](screenshots/Settings.png)
 
-Editing a tile shows it drawn exactly as the launcher draws it, both focused
-and dimmed, because a color that works lit is not always the one that works
-when it is not selected.
+Editing a tile shows it drawn exactly as the launcher draws it, at the same
+proportions and with the same logo treatment, so the color you pick is the
+color you get.
 
 ![Editing a tile](screenshots/Tile_Edit.png)
 
