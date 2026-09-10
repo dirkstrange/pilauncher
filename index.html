@@ -62,17 +62,25 @@
     background: var(--ink);
     display: grid;
     place-items: center;
-    animation: splash 5s ease forwards;
+    /* Opaque from the first frame. Fading the whole overlay in meant the
+       tiles were on screen underneath for the first second, which read as the
+       launcher loading and then being covered up. Only the mark fades in; the
+       backdrop just sits there and then takes the mark out with it. */
+    animation: splash-veil 5s ease forwards;
   }
   #splash img {
     width: min(52vw, 62vh);
     height: auto;
+    animation: splash-mark 5s ease forwards;
   }
-  @keyframes splash {
+  @keyframes splash-veil {
+    0%, 72% { opacity: 1; }
+    100%    { opacity: 0; }
+  }
+  @keyframes splash-mark {
     0%   { opacity: 0; }
     22%  { opacity: 1; }
-    70%  { opacity: 1; }
-    100% { opacity: 0; }
+    100% { opacity: 1; }
   }
 
   /* ---- header ---- */
@@ -477,7 +485,11 @@
     }
     if (seen) { splash.remove(); return; }
     const drop = () => splash.remove();
-    splash.addEventListener("animationend", drop, { once: true });
+    // Two animations end at once here, the backdrop and the mark inside it,
+    // and both bubble. Only the backdrop finishing means the splash is over.
+    splash.addEventListener("animationend", e => {
+      if (e.target === splash) drop();
+    });
     // A timer as well as the event. This overlay covers the whole screen, so
     // an animationend that never arrives would leave the launcher unusable
     // with no way to tell from the couch what had gone wrong.
