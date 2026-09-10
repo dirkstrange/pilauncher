@@ -233,15 +233,22 @@
     flex-direction: column;
     gap: 0.4em;
   }
-  .tile-previews { flex: 1; min-height: 0; display: flex; }
+  /* Taken out of flow so it contributes no height of its own. In flow it
+     sized itself from its width, 762 wide became 428 tall, and that drove
+     the whole row while the color column beside it ended 159px short.
+     Absolute with a top and a bottom gives it a definite height instead,
+     and the ratio then decides the width. */
+  .tile-previews { flex: 1 1 0; min-height: 0; position: relative; }
   /* A copy of the tile as the launcher draws it: same shape, same corner,
      same logo sizing. Kept in step with index.html by hand, which is the
      cost of previewing one page inside another and has already caught this
      preview out once. */
 
   .tile-preview {
-    position: relative;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
     width: auto;
     max-width: 100%;
     /* Matches .tile in index.html, which went to 16/9 when the grid became
@@ -373,6 +380,11 @@
     </div>
 
     <div class="field">
+      <div class="actions logo-actions">
+        <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
+        <button id="upload" type="button" data-nav>Upload a logo</button>
+        <button id="drop-logo" type="button" data-nav>Remove logo</button>
+      </div>
       <div class="color-row">
         <div class="color-board">
           <label for="palette-set">Tile color <span class="current-chip" id="current-chip"></span></label>
@@ -389,11 +401,6 @@
           <button id="eyedropper" type="button" data-nav hidden>Pick from screen</button>
         </div>
         <div class="color-side">
-          <div class="actions logo-actions">
-            <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
-            <button id="upload" type="button" data-nav>Upload a logo</button>
-            <button id="drop-logo" type="button" data-nav>Remove logo</button>
-          </div>
           <div class="logo-size" id="logo-size" hidden>
             <label for="f-scale">Logo size <span id="scale-value">100%</span></label>
             <input id="f-scale" type="range" min="0.4" max="1.4" step="0.05" value="1" data-nav>
