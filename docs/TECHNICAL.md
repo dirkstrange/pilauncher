@@ -430,6 +430,40 @@ then add a tile for it here.
 Deleting a tile takes its logo with it. Hiding one keeps every setting and only
 takes it off the grid.
 
+### A logo with its background baked in
+
+Some sites publish a mark already sitting on a solid rectangle rather than on
+transparency. It hides on a tile whose face happens to be the same color and
+appears the moment anything makes the face non-uniform, which is how the
+Apple TV logo turned into a visible black rectangle when the tiles gained
+their gradient.
+
+Uploading a transparent version is the honest fix. Where one is not to be
+had, the background can be keyed out, since these are marks on flat color
+rather than photographs:
+
+```python
+from PIL import Image
+im = Image.open("appletv.png").convert("RGBA")
+px, (w, h) = im.load(), im.size
+CUT = 60.0                      # fully opaque at or above this luminance
+for y in range(h):
+    for x in range(w):
+        r, g, b, _ = px[x, y]
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        # A ramp rather than a hard cut, so antialiased edges survive.
+        px[x, y] = (r, g, b, 255 if lum >= CUT else int(lum / CUT * 255))
+im.save("appletv.png")
+```
+
+Check the brightness distribution first. That file was 88% below luminance 10
+and the mark itself above 120, with under 1% in between, so a cut at 60 could
+not eat any of the logo. A mark with genuinely dark parts needs a different
+approach.
+
+Logos live in `~/.local/share/pilauncher/logos` and are per-machine, so this
+is a local repair rather than anything the repository carries.
+
 ### Editing from another machine
 
 The daemon listens on `127.0.0.1` alone by default, so the settings page exists
