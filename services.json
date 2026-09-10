@@ -144,5 +144,15 @@
     "ink": "#04250F",
     "note": "Audio only, so no decode load. Good background option.",
     "tile_bg": "#0A1410"
+  },
+  {
+    "id": "playstore",
+    "name": "Play Store",
+    "kind": "android",
+    "package": "com.android.vending",
+    "color": "#01875F",
+    "ink": "#FFFFFF",
+    "note": "Installs Android apps into Waydroid. Anything installed here turns up in Settings under installed Android apps, ready to add as a tile.",
+    "tile_bg": "#07160F"
   }
 ]

@@ -76,8 +76,10 @@
 
   /* Leaving the launcher was a tile at the end of the grid, which put it in
      the way of the services. As a corner control it is out of the way but
-     still reachable with arrows: Up from the top row lands here. */
-  #power {
+     still reachable with arrows: Up from the top row lands here. It opens
+     settings now; exiting to the desktop moved in there, since the Menu
+     button on the remote reaches the desktop without any tile at all. */
+  #gear {
     border: 0;
     background: var(--ink-raised);
     color: var(--haze);
@@ -90,20 +92,17 @@
     transition: transform 140ms ease, background 140ms ease,
                 color 140ms ease, box-shadow 140ms ease;
   }
-  #power svg {
-    width: 52%;
-    height: 52%;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.2;
-    stroke-linecap: round;
+  #gear svg {
+    width: 54%;
+    height: 54%;
+    fill: currentColor;
   }
-  #power.focused {
-    background: #E8402F;
-    color: #FFFFFF;
+  #gear.focused {
+    background: #4C8DFF;
+    color: #06122B;
     transform: scale(1.12);
     box-shadow:
-      0 0 46px -8px #E8402F,
+      0 0 46px -8px #4C8DFF,
       0 14px 30px -14px rgba(0, 0, 0, 0.9);
   }
 
@@ -364,10 +363,9 @@
       <div id="clock">--:--</div>
       <div id="date"></div>
     </div>
-    <button id="power" type="button" aria-label="Exit to the Raspberry Pi desktop">
+    <button id="gear" type="button" aria-label="Settings">
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 3.5 v8" />
-        <path d="M6.3 6.6 a7.5 7.5 0 1 0 11.4 0" />
+        <path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.48.48 0 0 0 .12-.61l-1.92-3.32a.48.48 0 0 0-.59-.22l-2.39.96a7.02 7.02 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.48.48 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.23.41.47.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
       </svg>
     </button>
   </header>
@@ -413,10 +411,10 @@
   let holdFired = false;
   let dragFrom = null;
 
-  // cursor === POWER means the corner power control has focus rather than any
-  // tile, which is how it stays reachable without a pointer.
-  const POWER = -1;
-  const power = document.getElementById("power");
+  // cursor === GEAR means the settings control in the corner has focus
+  // rather than any tile, which is how it stays reachable without a pointer.
+  const GEAR = -1;
+  const gear = document.getElementById("gear");
 
   /* ---------- clock ---------- */
   function tick() {
@@ -440,7 +438,7 @@
   }
 
   function paint() {
-    power.classList.toggle("focused", cursor === POWER);
+    gear.classList.toggle("focused", cursor === GEAR);
     tiles.forEach((t, i) => {
       const on = i === cursor;
       t.classList.toggle("focused", on);
@@ -508,7 +506,7 @@
   }
 
   function pickUp(i) {
-    if (i < 0 || i >= movableCount()) return;   // never the power control
+    if (i < 0 || i >= movableCount()) return;   // never the settings control
     moving = i;
     cursor = i;
     orderBeforeMove = services.slice();
@@ -545,15 +543,15 @@
   function move(delta) {
     if (!tiles.length) return;
     const cols = columns();
-    if (cursor === POWER) {
-      // Only downward leaves the power control, back into the top row.
+    if (cursor === GEAR) {
+      // Only downward leaves the settings control, back into the top row.
       if (delta > 0) { cursor = Math.min(cols - 1, tiles.length - 1); paint(); }
       return;
     }
     const next = cursor + delta;
-    // Up from the top row reaches the power control instead of stopping dead.
+    // Up from the top row reaches settings instead of stopping dead.
     if (next < 0) {
-      if (delta === -cols) { cursor = POWER; paint(); }
+      if (delta === -cols) { cursor = GEAR; paint(); }
       return;
     }
     if (next >= tiles.length) return;
@@ -626,21 +624,15 @@
 
   let busy = false;
 
-  function toDesktop() {
-    if (busy) return;
-    busy = true;
-    post("/desktop")
-      .then(res => {
-        if (res.error) note.innerHTML = '<span id="fault">' + res.error + "</span>";
-      })
-      .catch(() => {
-        // Expected on success: the window this page runs in is being closed.
-      })
-      .finally(() => { setTimeout(() => { busy = false; }, 800); });
+  function openSettings() {
+    // A page of its own rather than a panel here, so that the same editor
+    // serves a browser on another machine. Leaving for the Pi desktop lives
+    // in there now too.
+    location.href = "/edit";
   }
 
   function open() {
-    if (cursor === POWER) { toDesktop(); return; }
+    if (cursor === GEAR) { openSettings(); return; }
     const svc = services[cursor];
     if (!svc || busy) return;
     busy = true;
@@ -705,8 +697,8 @@
     e.preventDefault();
   });
 
-  power.addEventListener("click", () => { cursor = POWER; paint(); toDesktop(); });
-  power.addEventListener("mouseenter", () => { if (moving < 0) { cursor = POWER; paint(); } });
+  gear.addEventListener("click", () => { cursor = GEAR; paint(); openSettings(); });
+  gear.addEventListener("mouseenter", () => { if (moving < 0) { cursor = GEAR; paint(); } });
 
   // Mouse dragging shares the same move mode the keyboard uses, so both end
   // up in reorder() and animate identically.

@@ -388,15 +388,62 @@ grep -rn "<I361>" /usr/share/X11/xkb/symbols/
 
 No output means no keysym, and an hwdb remap is the fix.
 
+## Settings
+
+The gear in the top corner opens `/edit`, where tiles are added, changed,
+hidden and removed. It is a page in its own right rather than a panel drawn
+over the tiles, which is what lets the same editor answer a browser on another
+machine.
+
+A web service needs a name and an address. "Fetch logo and colours" then reads
+the site for the largest icon it advertises, using the lookup in
+[scripts/fetch_logos.py](scripts/fetch_logos.py), and guesses the three tile
+colours from that image. Guesses only fill blanks, so a colour typed by hand
+survives one. Some sites publish nothing usable, Netflix among them, and those
+want an uploaded image instead.
+
+Android tiles work differently, because there is no site to read a logo from
+and a package name one character out fails at launch with nothing on screen to
+explain why. The app is picked from a list of what Waydroid currently has
+installed rather than typed. Anything installed from the Play Store appears in
+that list, which is the intended route for adding one: install it in Android,
+then add a tile for it here.
+
+Deleting a tile takes its logo with it. Hiding one keeps every setting and only
+takes it off the grid.
+
+### Editing from another machine
+
+The daemon listens on `127.0.0.1` alone by default, so the settings page exists
+only on the Pi. `PILAUNCHER_BIND=0.0.0.0` in the service unit opens it to the
+house network at `http://<pi>:8800/edit`.
+
+What that does not open is control of the TV. `/launch`, `/close` and
+`/desktop` check the address a request came from and refuse anything that is
+not the Pi itself, whatever the daemon is bound to. Someone on the network can
+edit the catalog and cannot start playing something in the living room.
+
+### How the catalog is written
+
+`services.json` is the entire launcher, so a half-written file costs every tile
+at once. Writes land in a temporary file, get an fsync, and are renamed over
+the original, which is atomic within one filesystem. The previous version stays
+as `services.json.bak`, which is what to restore from when the mistake was in
+the content rather than in the writing.
+
+The daemon rereads the catalog on every request, so a saved change shows up on
+the next paint without restarting anything.
+
 ## Leaving the launcher
 
 The launcher covers the desktop and restarts itself if you close its window, so
 there are two deliberate ways out and both come back the same way.
 
-From the couch, arrow to the last tile, "Exit to Desktop", and press Enter. It
-posts to `/desktop`, which closes any open service and stops the shell unit.
-The Pi desktop is underneath. `Ctrl+Alt+D` does the same thing from anywhere,
-including from inside a service window.
+From the couch, arrow up to the gear, open it, and choose "Exit to the Pi
+desktop". It posts to `/desktop`, which closes any open service and stops the
+shell unit. The Pi desktop is underneath. `Ctrl+Alt+D` does the same from
+anywhere, including from inside a service window, and so does the Menu button
+on the remote.
 
 To get back, use the Media Launcher icon on the Pi desktop, or press
 `Ctrl+Alt+D` again. Compositor keybinds keep working at the desktop, so the one
@@ -429,6 +476,10 @@ stacked taskbars on the desktop is what that looks like.
 Also disable the desktop screensaver in `raspi-config` under Display Options.
 
 ## Editing the catalog
+
+The gear in the corner covers all of this now, and validates as it goes. What
+follows is the file it writes, for anyone editing `services.json` directly or
+reading a diff of it.
 
 ```json
 {

@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Launcher settings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400;62..125,500;62..125,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:        #1A1F2B;
+    --ink-raised: #141824;
+    --chalk:      #EDEFF4;
+    --haze:       #79839B;
+    --live:       #4C8DFF;
+    --warn:       #E8402F;
+    --safe-x: 4.5vw;
+    --safe-y: 4vh;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--ink);
+    color: var(--chalk);
+    font-family: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(14px, 1.15vw, 21px);
+  }
+
+  #page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: var(--safe-y) var(--safe-x) 12vh;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1em;
+    margin-bottom: 1.6em;
+  }
+  h1 {
+    font-size: clamp(24px, 2.6vw, 46px);
+    font-variation-settings: "wdth" 78, "wght" 500;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: 1.15em;
+    font-variation-settings: "wght" 500;
+    color: var(--haze);
+    margin: 2em 0 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  p.hint {
+    color: var(--haze);
+    margin: -0.3em 0 1em;
+    line-height: 1.5;
+  }
+
+  button, select, input {
+    font: inherit;
+    color: inherit;
+    border-radius: 12px;
+    border: 2px solid transparent;
+    background: var(--ink-raised);
+    padding: 0.62em 0.9em;
+  }
+  button { cursor: pointer; }
+
+  /* One focus treatment for everything. The d-pad on the remote is the main
+     way around this page, so whatever holds focus has to be obvious from
+     across a room. */
+  [data-nav]:focus {
+    outline: none;
+    border-color: var(--live);
+    box-shadow: 0 0 0 4px rgba(76, 141, 255, 0.22);
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 0.9em;
+    background: var(--ink-raised);
+    border: 2px solid transparent;
+    border-radius: 14px;
+    padding: 0.7em 0.9em;
+    margin-bottom: 0.6em;
+    width: 100%;
+    text-align: left;
+  }
+  .row .swatch {
+    width: 2.4em;
+    height: 2.4em;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    overflow: hidden;
+    font-variation-settings: "wght" 700;
+  }
+  .row .swatch img { width: 76%; height: 76%; object-fit: contain; }
+  .row .who { flex: 1; min-width: 0; }
+  .row .who b { font-variation-settings: "wght" 500; }
+  .row .who small { display: block; color: var(--haze); }
+  .tag {
+    font-size: 0.78em;
+    color: var(--haze);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0.1em 0.6em;
+    flex: none;
+  }
+
+  .actions { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1em; }
+  .primary { background: var(--live); color: #06122B; font-variation-settings: "wght" 500; }
+  .danger  { background: transparent; border-color: var(--warn); color: var(--warn); }
+
+  .field { margin-bottom: 0.9em; }
+  .field label { display: block; color: var(--haze); margin-bottom: 0.3em; }
+  .field input, .field select { width: 100%; }
+  .colours { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6em; }
+  .colour-preview {
+    height: 4.2em;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    font-variation-settings: "wght" 700;
+    margin-bottom: 0.9em;
+  }
+
+  #note {
+    margin-top: 1em;
+    min-height: 1.5em;
+    color: var(--haze);
+    line-height: 1.5;
+  }
+  #note.bad { color: var(--warn); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="page">
+  <header>
+    <h1 id="title">Settings</h1>
+    <button id="done" type="button" data-nav>Done</button>
+  </header>
+
+  <!-- ---------- list view ---------- -->
+  <section id="list-view">
+    <button class="row primary" id="add" type="button" data-nav>
+      <span class="swatch" style="background:#06122B;color:#4C8DFF">+</span>
+      <span class="who"><b>Add a service</b><small>A web page, or an app already installed in Android</small></span>
+    </button>
+
+    <h2>Tiles</h2>
+    <div id="tiles"></div>
+
+    <h2>Installed Android apps</h2>
+    <p class="hint" id="android-hint">Looking for installed apps...</p>
+    <div id="android"></div>
+
+    <h2>This machine</h2>
+    <button class="row" id="desktop" type="button" data-nav>
+      <span class="swatch" style="background:#2A1714;color:#E8402F">&#9211;</span>
+      <span class="who"><b>Exit to the Pi desktop</b><small>The same thing the Menu button on the remote does</small></span>
+    </button>
+  </section>
+
+  <!-- ---------- form view ---------- -->
+  <section id="form-view" hidden>
+    <div class="colour-preview" id="preview">Preview</div>
+
+    <div class="field">
+      <label for="f-name">Name</label>
+      <input id="f-name" data-nav autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label for="f-kind">Type</label>
+      <select id="f-kind" data-nav>
+        <option value="">Web page</option>
+        <option value="android">Android app</option>
+      </select>
+    </div>
+
+    <div class="field" id="url-field">
+      <label for="f-url">Address</label>
+      <input id="f-url" data-nav autocomplete="off" spellcheck="false" placeholder="https://">
+    </div>
+
+    <div class="field" id="package-field" hidden>
+      <label for="f-package">Android app</label>
+      <select id="f-package" data-nav></select>
+    </div>
+
+    <div class="field">
+      <label>Colours</label>
+      <div class="colours">
+        <input id="f-color" data-nav placeholder="#RRGGBB tile" aria-label="Tile colour">
+        <input id="f-ink" data-nav placeholder="#RRGGBB text" aria-label="Text colour">
+        <input id="f-tile_bg" data-nav placeholder="#RRGGBB back" aria-label="Background colour">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-note">Note (only ever shown here)</label>
+      <input id="f-note" data-nav autocomplete="off">
+    </div>
+
+    <button class="row" id="hidden-toggle" type="button" data-nav>
+      <span class="swatch" id="hidden-mark" style="background:#06122B;color:#79839B">&#10003;</span>
+      <span class="who"><b id="hidden-label">Shown on the launcher</b><small>Hidden tiles stay in the catalog and keep their settings</small></span>
+    </button>
+
+    <div class="actions">
+      <button id="fetch" type="button" data-nav>Fetch logo and colours</button>
+      <button id="upload" type="button" data-nav>Upload a logo</button>
+      <button id="drop-logo" type="button" data-nav>Remove logo</button>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="save" type="button" data-nav>Save</button>
+      <button id="cancel" type="button" data-nav>Cancel</button>
+      <button class="danger" id="remove" type="button" data-nav>Delete this tile</button>
+    </div>
+
+    <input id="file" type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+  </section>
+
+  <div id="note"></div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const note = $("note");
+  let catalog = [];
+  let apps = [];
+  let editing = null;      // the service being edited, or null when adding
+  let logoUrl = null;      // logo for the service in the form, if it has one
+  let isHidden = false;
+
+  function say(text, bad) {
+    note.textContent = text || "";
+    note.classList.toggle("bad", Boolean(bad));
+  }
+
+  async function api(path, body) {
+    const opts = body
+      ? { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body) }
+      : {};
+    const res = await fetch(path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+    return data;
+  }
+
+  /* ---------- navigation ----------
+     The remote sends plain arrow keys and this is a form, so focus is moved
+     by hand. Chromium only does that by itself with spatial navigation on,
+     which the launcher shell deliberately does not enable. Left and right are
+     left alone so they still move the caret inside a text box. */
+  function focusables() {
+    return [...document.querySelectorAll("[data-nav]")]
+      .filter(el => el.offsetParent !== null && !el.disabled);
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const items = focusables();
+      if (!items.length) return;
+      const at = items.indexOf(document.activeElement);
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      // Wraps on purpose: the end of a long tile list is quicker to reach
+      // upwards from the top than by holding an arrow down.
+      const next = at < 0 ? 0 : (at + step + items.length) % items.length;
+      items[next].focus();
+      items[next].scrollIntoView({ block: "nearest" });
+      e.preventDefault();
+    } else if (e.key === "BrowserBack" || e.key === "Escape") {
+      if ($("form-view").hidden) leave();
+      else showList();
+      e.preventDefault();
+    }
+  });
+
+  /* ---------- list ---------- */
+  function tile(svc) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "row";
+    row.setAttribute("data-nav", "");
+    row.innerHTML =
+      '<span class="swatch"></span>' +
+      '<span class="who"><b></b><small></small></span>' +
+      (svc.kind === "android" ? '<span class="tag">Android</span>' : "") +
+      (svc.hidden ? '<span class="tag">Hidden</span>' : "");
+    const swatch = row.querySelector(".swatch");
+    swatch.style.background = svc.tile_bg || "#06122B";
+    swatch.style.color = svc.color || "#EDEFF4";
+    if (svc.logo) {
+      const img = document.createElement("img");
+      img.src = svc.logo;
+      img.alt = "";
+      swatch.appendChild(img);
+    } else {
+      swatch.textContent = (svc.name || "?").slice(0, 1).toUpperCase();
+    }
+    // Names and addresses come from the catalog, which is edited here and by
+    // hand, so they go in as text rather than as markup.
+    row.querySelector("b").textContent = svc.name;
+    row.querySelector("small").textContent =
+      (svc.kind === "android" ? svc.package : svc.url) || "";
+    row.addEventListener("click", () => showForm(svc));
+    return row;
+  }
+
+  function renderList() {
+    const box = $("tiles");
+    box.textContent = "";
+    catalog.forEach(svc => box.appendChild(tile(svc)));
+  }
+
+  function renderAndroid() {
+    const box = $("android");
+    const hint = $("android-hint");
+    box.textContent = "";
+    if (!apps.length) {
+      hint.textContent = "No Android apps found. Waydroid may not be running.";
+      return;
+    }
+    const known = new Set(catalog.filter(s => s.package).map(s => s.package));
+    const fresh = apps.filter(a => !known.has(a.package));
+    if (!fresh.length) {
+      hint.textContent = "Every installed app already has a tile.";
+      return;
+    }
+    hint.textContent = "Installed in Android but not on the launcher. " +
+      "Anything added from the Play Store turns up here.";
+    fresh.forEach(app => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "row";
+      row.setAttribute("data-nav", "");
+      row.innerHTML =
+        '<span class="swatch" style="background:#06122B;color:#4C8DFF">+</span>' +
+        '<span class="who"><b></b><small></small></span>';
+      row.querySelector("b").textContent = app.name;
+      row.querySelector("small").textContent = app.package;
+      row.addEventListener("click", () => {
+        showForm({ name: app.name, kind: "android", package: app.package });
+      });
+      box.appendChild(row);
+    });
+  }
+
+  function showList() {
+    $("form-view").hidden = true;
+    $("list-view").hidden = false;
+    $("title").textContent = "Settings";
+    renderList();
+    renderAndroid();
+    $("add").focus();
+  }
+
+  /* ---------- form ---------- */
+  function slug(name) {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+/, "").replace(/-+$/, "").slice(0, 32);
+  }
+
+  function setHidden(value) {
+    isHidden = value;
+    $("hidden-label").textContent =
+      value ? "Hidden from the launcher" : "Shown on the launcher";
+    $("hidden-mark").textContent = value ? "✕" : "✓";
+  }
+
+  function fillPackages(selected) {
+    const sel = $("f-package");
+    sel.textContent = "";
+    const listed = apps.slice();
+    if (selected && !listed.some(a => a.package === selected)) {
+      // Keep a package that is in the catalog but not installed at the
+      // moment, so editing that tile does not quietly repoint it elsewhere.
+      listed.unshift({ name: selected + " (not installed)", package: selected });
+    }
+    listed.forEach(app => {
+      const opt = document.createElement("option");
+      opt.value = app.package;
+      opt.textContent = app.name;
+      sel.appendChild(opt);
+    });
+    if (selected) sel.value = selected;
+  }
+
+  function onKind() {
+    const android = $("f-kind").value === "android";
+    $("url-field").hidden = android;
+    $("package-field").hidden = !android;
+    // Fetching reads the logo off the site, and an Android app has no site.
+    $("fetch").disabled = android;
+  }
+
+  function paint() {
+    const box = $("preview");
+    box.style.background = $("f-tile_bg").value || "#06122B";
+    box.style.color = $("f-color").value || "#EDEFF4";
+    box.textContent = "";
+    if (logoUrl) {
+      const img = document.createElement("img");
+      // The filename does not change when a logo is replaced, so the cache
+      // has to be stepped around or the old picture stays on screen.
+      img.src = logoUrl + "?t=" + Date.now();
+      img.style.height = "70%";
+      box.appendChild(img);
+    } else {
+      box.textContent = $("f-name").value || "Preview";
+    }
+  }
+
+  function showForm(svc) {
+    editing = svc && svc.id ? svc : null;
+    const seed = svc || {};
+    $("list-view").hidden = true;
+    $("form-view").hidden = false;
+    $("title").textContent = editing ? "Edit tile" : "Add a tile";
+    $("f-name").value = seed.name || "";
+    $("f-kind").value = seed.kind === "android" ? "android" : "";
+    $("f-url").value = seed.url || "";
+    $("f-note").value = seed.note || "";
+    $("f-color").value = seed.color || "";
+    $("f-ink").value = seed.ink || "";
+    $("f-tile_bg").value = seed.tile_bg || "";
+    logoUrl = seed.logo || null;
+    $("remove").hidden = !editing;
+    setHidden(Boolean(seed.hidden));
+    fillPackages(seed.package || "");
+    onKind();
+    paint();
+    say("");
+    $("f-name").focus();
+  }
+
+  function currentId() {
+    return editing ? editing.id : slug($("f-name").value);
+  }
+
+  function formService() {
+    const svc = { id: currentId(), name: $("f-name").value.trim() };
+    if ($("f-kind").value === "android") {
+      svc.kind = "android";
+      svc.package = $("f-package").value;
+    } else {
+      svc.url = $("f-url").value.trim();
+    }
+    ["color", "ink", "tile_bg", "note"].forEach(field => {
+      const value = $("f-" + field).value.trim();
+      if (value) svc[field] = value;
+    });
+    if (isHidden) svc.hidden = true;
+    return svc;
+  }
+
+  /* ---------- actions ---------- */
+  function leave() { location.href = "/"; }
+
+  $("done").addEventListener("click", leave);
+  $("add").addEventListener("click", () => showForm(null));
+  $("cancel").addEventListener("click", showList);
+  $("f-kind").addEventListener("change", onKind);
+  $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
+  ["f-name", "f-color", "f-ink", "f-tile_bg"].forEach(id => {
+    $(id).addEventListener("input", paint);
+  });
+
+  $("save").addEventListener("click", async () => {
+    const svc = formService();
+    if (!svc.id) { say("Give it a name first.", true); return; }
+    try {
+      await api("/service", svc);
+      catalog = await api("/catalog");
+      showList();
+      say("Saved.");
+    } catch (err) {
+      say(err.message, true);
+    }
+  });
+
+  $("remove").addEventListener("click", async () => {
+    if (!editing) return;
+    try {
+      await api("/service/delete", { id: editing.id });
+      catalog = await api("/catalog");
+      showList();
+      say("Deleted.");
+    } catch (err) {
+      say(err.message, true);
+    }
+  });
+
+  $("fetch").addEventListener("click", async () => {
+    const id = currentId();
+    const url = $("f-url").value.trim();
+    if (!id) { say("Give it a name first.", true); return; }
+    if (!url) { say("Fill in the address first.", true); return; }
+    say("Looking for a logo...");
+    try {
+      const res = await api("/logo", { id: id, url: url });
+      logoUrl = res.logo;
+      const guess = res.suggested || {};
+      // Only fill blanks. A colour already chosen by hand beats a guess.
+      ["color", "ink", "tile_bg"].forEach(field => {
+        if (guess[field] && !$("f-" + field).value.trim()) {
+          $("f-" + field).value = guess[field];
+        }
+      });
+      paint();
+      say("Found one. Save to keep it.");
+    } catch (err) {
+      say(err.message, true);
+    }
+  });
+
+  $("upload").addEventListener("click", () => $("file").click());
+
+  $("file").addEventListener("change", () => {
+    const file = $("file").files[0];
+    const id = currentId();
+    if (!file) return;
+    if (!id) { say("Give it a name first.", true); return; }
+    const ext = { "image/png": ".png", "image/jpeg": ".jpg",
+                  "image/svg+xml": ".svg", "image/webp": ".webp" }[file.type];
+    if (!ext) { say("That image type is not supported.", true); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await api("/logo", { id: id, data: reader.result, ext: ext });
+        logoUrl = res.logo;
+        paint();
+        say("Logo set. Save to keep it.");
+      } catch (err) {
+        say(err.message, true);
+      }
+    };
+    reader.readAsDataURL(file);
+    $("file").value = "";
+  });
+
+  $("drop-logo").addEventListener("click", async () => {
+    const id = currentId();
+    if (!id) return;
+    try {
+      await api("/logo", { id: id, clear: true });
+      logoUrl = null;
+      paint();
+      say("Logo removed.");
+    } catch (err) {
+      say(err.message, true);
+    }
+  });
+
+  $("desktop").addEventListener("click", async () => {
+    try {
+      await api("/desktop", {});
+    } catch (err) {
+      // Refused when this page is open on another machine. That is the rule
+      // working, so it is reported plainly rather than dressed up as a fault.
+      say(err.message, true);
+    }
+  });
+
+  /* ---------- start ---------- */
+  (async () => {
+    try {
+      catalog = await api("/catalog");
+    } catch (err) {
+      say("Could not read the catalog: " + err.message, true);
+      return;
+    }
+    renderList();
+    $("add").focus();
+    // The app list shells out to waydroid and can take a moment, so the page
+    // is usable before it arrives.
+    try {
+      apps = await api("/android/apps");
+    } catch (err) {
+      apps = [];
+    }
+    renderAndroid();
+  })();
+})();
+</script>
+</body>
+</html>

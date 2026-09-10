@@ -770,6 +770,16 @@ class Handler(BaseHTTPRequestHandler):
             # losing its colours and notes.
             visible = with_logos([s for s in load_services() if not s.get("hidden")])
             self._send(200, json.dumps(visible).encode(), "application/json")
+        elif path == "/edit":
+            # The settings page. A page of its own rather than a panel inside
+            # the tiles, so that opening it from another machine gives an
+            # editor and not a screenful of buttons that launch things here.
+            try:
+                body = (BASE / "edit.html").read_bytes()
+            except OSError:
+                self._json(500, {"error": "edit.html missing"})
+                return
+            self._send(200, body, "text/html; charset=utf-8")
         elif path == "/android/apps":
             # Feeds the picker in the settings page, so an app installed from
             # the Play Store becomes a tile without anyone typing a package
