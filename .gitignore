@@ -24,6 +24,12 @@ shell/
 # Pironman case OLED. It is deliberately kept and deliberately untracked, so do
 # not delete it as clutter. Being ignored, git is NOT a backup of it.
 
+# Working folder for service logo artwork on its way to the Pi. The file rules
+# above already catch every image type in it; the folder is named here as well
+# because its whole contents are other people's trademarks and one rule is a
+# thin margin for that on a public repository.
+app-logos/
+
 # design/ is the brand kit: the marks, the tokens and the sheet they are
 # documented on. The rule above exists to catch a service logo dropped in on
 # its way to the Pi, which is the opposite of this. The launcher inlines these
