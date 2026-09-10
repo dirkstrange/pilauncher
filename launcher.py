@@ -19,13 +19,17 @@ Environment overrides:
     PILAUNCHER_WALLPAPER_FEEDS  bing,apod,nasa-library,epic (default bing,apod)
     PILAUNCHER_NASA_QUERY search terms for the nasa-library feed
     PILAUNCHER_LOGOS      directory of service logo images
+    PILAUNCHER_BIND       listen address (default 127.0.0.1; 0.0.0.0 opens
+                          the settings page to the LAN, never TV control)
 """
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import random
+import re
 import shutil
 import signal
 import subprocess
@@ -46,6 +50,18 @@ PROFILE_ROOT = Path(
 )
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
+# Named once because the catalog is now written through the API as well as
+# read, and both paths have to agree on which file that is.
+SERVICES_FILE = BASE / "services.json"
+# Editing from another machine is opt-in: set PILAUNCHER_BIND=0.0.0.0 to open
+# the settings page to a browser on the LAN. The endpoints below stay refused
+# to every address but this one regardless, so opening that door lets the
+# network edit the catalog without handing it a remote control for the TV.
+BIND = os.environ.get("PILAUNCHER_BIND", HOST)
+LOCAL_ONLY = frozenset({"/launch", "/close", "/desktop"})
+# Enough for a generous PNG, small enough that a mistyped upload cannot
+# fill the card.
+LOGO_MAX_BYTES = 2 * 1024 * 1024
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
 # Android services are launched through waydroid. Launching works as the
 # desktop user, but stopping an app needs "waydroid shell", which insists on
@@ -122,7 +138,7 @@ _lock = threading.Lock()
 
 def load_catalog() -> list[dict]:
     """The catalog as written in services.json, in file order."""
-    with open(BASE / "services.json", encoding="utf-8") as fh:
+    with open(SERVICES_FILE, encoding="utf-8") as fh:
         return json.load(fh)
 
 
@@ -304,6 +320,238 @@ def find_service(service_id: str) -> dict | None:
         if svc.get("id") == service_id:
             return svc
     return None
+
+
+# A service id becomes a logo filename and a key in order.json, so it is held
+# to something that needs no escaping in either place.
+ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
+HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+# Package names as Android defines them: dot-separated segments each starting
+# with a letter. A typo here fails at launch with nothing useful on screen,
+# which is why the settings page offers a list instead of a text box.
+PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*([.][A-Za-z][A-Za-z0-9_]*)+$")
+CATALOG_FIELDS = frozenset({
+    "id", "name", "url", "color", "ink", "tile_bg", "note",
+    "kind", "package", "user_agent", "extra_flags", "hidden",
+})
+
+
+def slugify(name: str) -> str:
+    """Turn a display name into a candidate id."""
+    flat = "".join(c if c.isalnum() else "-" for c in name.lower())
+    return "-".join(part for part in flat.split("-") if part)[:32]
+
+
+def validate_service(raw: dict) -> dict:
+    """Check one catalog entry and return it cleaned.
+
+    Raises ValueError carrying a message written for whoever is editing: it is
+    shown in the settings page, not filed in a log.
+
+    Unknown fields are rejected rather than dropped. Silently discarding a
+    misspelled key would look like the setting had been saved.
+    """
+    if not isinstance(raw, dict):
+        raise ValueError("service must be an object")
+    unknown = sorted(set(raw) - CATALOG_FIELDS)
+    if unknown:
+        raise ValueError("unknown fields: " + ", ".join(unknown))
+
+    svc: dict = {}
+    sid = str(raw.get("id") or "").strip()
+    if not ID_RE.match(sid):
+        raise ValueError("id must be lowercase letters, digits and hyphens")
+    svc["id"] = sid
+
+    name = str(raw.get("name") or "").strip()
+    if not name:
+        raise ValueError("name is required")
+    if len(name) > 40:
+        raise ValueError("name is too long for a tile, 40 characters at most")
+    svc["name"] = name
+
+    kind = str(raw.get("kind") or "").strip()
+    if kind and kind != "android":
+        raise ValueError("kind must be android, or empty for a web page")
+
+    if kind == "android":
+        package = str(raw.get("package") or "").strip()
+        if not PACKAGE_RE.match(package):
+            raise ValueError("package must look like com.example.app")
+        svc["kind"] = "android"
+        svc["package"] = package
+    else:
+        url = str(raw.get("url") or "").strip()
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("url must start with http:// or https://")
+        svc["url"] = url
+
+    for field in ("color", "ink", "tile_bg"):
+        value = str(raw.get(field) or "").strip()
+        if not value:
+            continue
+        if not HEX_RE.match(value):
+            raise ValueError(field + " must be a colour like #1A2B3C")
+        svc[field] = value.upper()
+
+    for field in ("note", "user_agent"):
+        value = str(raw.get(field) or "").strip()
+        if value:
+            svc[field] = value
+
+    flags = raw.get("extra_flags")
+    if flags:
+        if not isinstance(flags, list) or not all(isinstance(f, str) for f in flags):
+            raise ValueError("extra_flags must be a list of strings")
+        svc["extra_flags"] = flags
+
+    if raw.get("hidden"):
+        svc["hidden"] = True
+    return svc
+
+
+def save_catalog(services: list[dict]) -> None:
+    """Replace services.json, keeping the previous version beside it.
+
+    The catalog is the entire launcher, so a half-written file costs every
+    tile at once. The replacement is built alongside the original and renamed
+    over it, which is atomic within one filesystem, and the .bak left behind
+    is what to reach for when the mistake was in the content rather than in
+    the writing.
+    """
+    body = json.dumps(services, indent=2, ensure_ascii=False) + "\n"
+    tmp = SERVICES_FILE.with_name(SERVICES_FILE.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(body)
+        fh.flush()
+        # This box loses power without warning. Without the sync a rename can
+        # land before the bytes do, which is how a catalog comes back empty.
+        os.fsync(fh.fileno())
+    if SERVICES_FILE.exists():
+        shutil.copy2(SERVICES_FILE, SERVICES_FILE.with_name(SERVICES_FILE.name + ".bak"))
+    os.replace(tmp, SERVICES_FILE)
+
+
+def logo_path(service_id: str) -> Path | None:
+    for ext in LOGO_TYPES:
+        candidate = LOGO_DIR / (service_id + ext)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def clear_logo(service_id: str) -> None:
+    """Remove every logo file for a service, whatever extension it used."""
+    for ext in LOGO_TYPES:
+        candidate = LOGO_DIR / (service_id + ext)
+        if candidate.is_file():
+            candidate.unlink()
+
+
+def fetch_logo(svc: dict) -> None:
+    """Pull a logo for one service, reusing the standalone fetcher.
+
+    Loaded by path at call time because scripts/ is not a package, and because
+    a fault in the fetcher should cost the settings page one feature rather
+    than stop the daemon from starting.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "pilauncher_fetch_logos", BASE / "scripts" / "fetch_logos.py"
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError("scripts/fetch_logos.py is missing")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    LOGO_DIR.mkdir(parents=True, exist_ok=True)
+    module.fetch_one(svc, LOGO_DIR, True)
+
+
+def palette_from_logo(path: Path) -> dict:
+    """Guess tile colours from a logo.
+
+    A suggestion only: the settings page fills the fields in and lets them be
+    changed afterwards. Pillow is optional, so a box without it gets no guess.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return {}
+    counts: dict[tuple[int, int, int], int] = {}
+    coloured: dict[tuple[int, int, int], int] = {}
+    try:
+        with Image.open(path) as img:
+            img = img.convert("RGBA")
+            img.thumbnail((64, 64))
+            for red, green, blue, alpha in img.getdata():
+                if alpha < 128:
+                    continue
+                bucket = (red // 32, green // 32, blue // 32)
+                counts[bucket] = counts.get(bucket, 0) + 1
+                # Greys are counted separately. Most logos are mostly white,
+                # black or something in between, so counting those together
+                # with the rest reliably returns the background rather than
+                # the brand, which is what a first attempt at this did.
+                if max(red, green, blue) - min(red, green, blue) >= 40:
+                    coloured[bucket] = coloured.get(bucket, 0) + 1
+    except (OSError, ValueError):
+        return {}
+    # Fall back to the greys only for a logo that genuinely has no colour in
+    # it, so a black-and-white mark still produces something usable.
+    counts = coloured or counts
+    if not counts:
+        return {}
+    red, green, blue = (v * 32 + 16 for v in max(counts, key=lambda k: counts[k]))
+    # sRGB luminance weights, deciding whether a label sitting on this colour
+    # should be black or white.
+    luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
+    return {
+        "color": "#%02X%02X%02X" % (red, green, blue),
+        "ink": "#000000" if luminance > 0.6 else "#FFFFFF",
+        # Tile backgrounds in this catalog are near-black shades of the brand
+        # colour, which keeps a wall of them calm on a big screen.
+        "tile_bg": "#%02X%02X%02X" % (red // 8, green // 8, blue // 8),
+    }
+
+
+def android_apps() -> list[dict]:
+    """Launchable Android apps, as waydroid currently reports them.
+
+    Filtered to the LAUNCHER category, which is what separates an app someone
+    can open from the system plumbing that shares the same list. Nothing is
+    cached: the point of asking is to see what was installed from the Play
+    Store a minute ago.
+    """
+    if not shutil.which(WAYDROID):
+        return []
+    try:
+        listing = subprocess.run(
+            [WAYDROID, "app", "list"],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+
+    apps: list[dict] = []
+    current: dict = {}
+
+    def keep(entry: dict) -> None:
+        if entry.get("launchable") and entry.get("name") and entry.get("package"):
+            apps.append({"name": entry["name"], "package": entry["package"]})
+
+    for line in listing.splitlines():
+        line = line.strip()
+        if line.startswith("Name:"):
+            keep(current)
+            current = {"name": line[len("Name:"):].strip()}
+        elif line.startswith("packageName:"):
+            current["package"] = line[len("packageName:"):].strip()
+        elif line == "android.intent.category.LAUNCHER":
+            current["launchable"] = True
+    keep(current)
+    return sorted(apps, key=lambda a: a["name"].lower())
 
 
 def stop_current() -> bool:
@@ -496,6 +744,14 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _is_local(self) -> bool:
+        """True when the request came from this machine.
+
+        Read from the peer address rather than a header, because a header is
+        whatever the client chooses to say.
+        """
+        return self.client_address[0] in ("127.0.0.1", "::1", "::ffff:127.0.0.1")
+
     def _json(self, status: int, payload: dict) -> None:
         self._send(status, json.dumps(payload).encode(), "application/json")
 
@@ -514,6 +770,16 @@ class Handler(BaseHTTPRequestHandler):
             # losing its colours and notes.
             visible = with_logos([s for s in load_services() if not s.get("hidden")])
             self._send(200, json.dumps(visible).encode(), "application/json")
+        elif path == "/android/apps":
+            # Feeds the picker in the settings page, so an app installed from
+            # the Play Store becomes a tile without anyone typing a package
+            # name, which is the one field that fails silently when wrong.
+            self._send(200, json.dumps(android_apps()).encode(), "application/json")
+        elif path == "/catalog":
+            # Everything, hidden entries included, which is what the settings
+            # page edits. /services.json stays the filtered view the tiles use.
+            body = json.dumps(with_logos(load_catalog())).encode()
+            self._send(200, body, "application/json")
         elif path.startswith("/logos/"):
             name = path[len("/logos/"):]
             # Resolve and confirm the result is still inside LOGO_DIR, so a
@@ -571,6 +837,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": "body must be JSON"})
             return
 
+        if path in LOCAL_ONLY and not self._is_local():
+            # The settings page may be open on a laptop. Driving the TV from
+            # one is a different thing entirely and is not on offer.
+            self._json(403, {"error": "only this machine can drive the TV"})
+            return
+
         if path == "/launch":
             svc = find_service(str(payload.get("id", "")))
             if svc is None:
@@ -621,15 +893,108 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"desktop": True})
             else:
                 self._json(500, {"error": f"could not stop {SHELL_UNIT}"})
+        elif path == "/service":
+            try:
+                svc = validate_service(payload)
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            catalog = load_catalog()
+            at = next(
+                (i for i, s in enumerate(catalog) if s.get("id") == svc["id"]), None
+            )
+            if at is None:
+                catalog.append(svc)
+            else:
+                catalog[at] = svc
+            try:
+                save_catalog(catalog)
+            except OSError as exc:
+                self._json(500, {"error": f"could not save the catalog: {exc}"})
+                return
+            self._json(200, {"saved": svc["id"], "created": at is None})
+        elif path == "/service/delete":
+            sid = str(payload.get("id") or "")
+            catalog = load_catalog()
+            remaining = [s for s in catalog if s.get("id") != sid]
+            if len(remaining) == len(catalog):
+                self._json(404, {"error": "no such service"})
+                return
+            try:
+                save_catalog(remaining)
+            except OSError as exc:
+                self._json(500, {"error": f"could not save the catalog: {exc}"})
+                return
+            # Drop the image too. Leaving it behind means a later service that
+            # happens to reuse the id silently inherits the old picture.
+            clear_logo(sid)
+            self._json(200, {"deleted": sid})
+        elif path == "/logo":
+            sid = str(payload.get("id") or "").strip()
+            if not ID_RE.match(sid):
+                self._json(400, {"error": "id must be lowercase letters, digits and hyphens"})
+                return
+            if payload.get("clear"):
+                clear_logo(sid)
+                self._json(200, {"cleared": sid})
+                return
+            data = payload.get("data")
+            if data:
+                ext = str(payload.get("ext") or ".png").lower()
+                if ext not in LOGO_TYPES:
+                    self._json(400, {"error": "logo must be " + ", ".join(sorted(LOGO_TYPES))})
+                    return
+                try:
+                    # Accepts a bare base64 body or a whole data: URL, since the
+                    # settings page reads files with FileReader and gets the latter.
+                    blob = base64.b64decode(str(data).split(",", 1)[-1], validate=True)
+                except (ValueError, TypeError):
+                    self._json(400, {"error": "data must be base64"})
+                    return
+                if len(blob) > LOGO_MAX_BYTES:
+                    self._json(400, {"error": "that image is too large"})
+                    return
+                clear_logo(sid)
+                LOGO_DIR.mkdir(parents=True, exist_ok=True)
+                (LOGO_DIR / (sid + ext)).write_bytes(blob)
+            else:
+                url = str(payload.get("url") or "").strip()
+                parsed = urllib.parse.urlparse(url)
+                if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                    self._json(400, {"error": "url must start with http:// or https://"})
+                    return
+                previous = logo_path(sid)
+                keep = (previous.name, previous.read_bytes()) if previous else None
+                clear_logo(sid)
+                try:
+                    fetch_logo({"id": sid, "url": url})
+                except Exception as exc:
+                    # Deliberately broad: the fetcher reaches out over the
+                    # network to sites that misbehave in inventive ways, and
+                    # none of it is worth taking the daemon down for.
+                    if keep is not None:
+                        # A failed lookup should not cost the tile the image it
+                        # already had.
+                        (LOGO_DIR / keep[0]).write_bytes(keep[1])
+                    self._json(502, {"error": f"could not fetch a logo: {exc}"})
+                    return
+            found = logo_path(sid)
+            if found is None:
+                self._json(502, {"error": "that site published no usable icon"})
+                return
+            self._json(
+                200,
+                {"logo": "/logos/" + found.name, "suggested": palette_from_logo(found)},
+            )
         else:
             self._json(404, {"error": "not found"})
 
 
 def main() -> None:
     PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    server = ThreadingHTTPServer((BIND, PORT), Handler)
     server.daemon_threads = True
-    print(f"pilauncher listening on http://{HOST}:{PORT}", flush=True)
+    print(f"pilauncher listening on http://{BIND}:{PORT}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
