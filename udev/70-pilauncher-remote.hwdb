@@ -1,0 +1,21 @@
+# Key fixups for the remote control, matched on the receiver's USB ids.
+#
+# HAOBO 4842:0001 is the dongle for the G20-style air-mouse remote. Its OK
+# button reports HID consumer usage 0x0c/0x41 ("Menu Pick"), which the kernel
+# translates to KEY_SELECT. xkb's evdev keycode table has an entry for that
+# code but no symbols file binds a keysym to it, so every Wayland client gets a
+# keypress it cannot name: Chromium never raises an "Enter" DOM event and the
+# tile under the cursor never opens. The button looks dead, and in mouse mode
+# it appears to recover only because the remote sends a left click instead.
+#
+# Nothing downstream can repair this. By the time labwc or the page sees the
+# event the key is already nameless, so the remap has to happen here, while
+# evdev still has the raw scancode in hand.
+#
+# The remote's other buttons emit codes that do have keysyms, so they are bound
+# in labwc or handled in index.html rather than rewritten here.
+#
+# The version field is deliberately left out of the match so a firmware
+# revision on the dongle does not silently drop the rule.
+evdev:input:b0003v4842p0001*
+ KEYBOARD_KEY_c0041=enter

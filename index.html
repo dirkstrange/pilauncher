@@ -684,6 +684,10 @@
       case "Escape":
       case "Backspace":
       case "Home":
+      // The remote's back arrow. Chromium would treat it as history-back,
+      // which does nothing on the tile page, so cancel or close instead.
+      // Inside a service window the key is left alone and still navigates.
+      case "BrowserBack":
         if (moving >= 0) drop(false); else close();
         break;
       default: return;

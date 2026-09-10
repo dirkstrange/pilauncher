@@ -183,6 +183,24 @@ if pgrep -x labwc >/dev/null; then
   kill -HUP "$(pgrep -x labwc | head -1)" 2>/dev/null && ok "labwc config reloaded"
 fi
 
+# ------------------------------------------------------------------- remote
+say "Configuring the remote control"
+
+# The OK button on the G20-style remote emits a key that carries no xkb keysym,
+# so it has to be rewritten in evdev before any client sees it. The rule file
+# carries the full reasoning.
+HWDB_RULE=/etc/udev/hwdb.d/70-pilauncher-remote.hwdb
+if sudo install -o root -g root -m 0644 "$HERE/udev/70-pilauncher-remote.hwdb" "$HWDB_RULE"; then
+  sudo systemd-hwdb update
+  # The compiled database is only consulted when a device is added, so a remote
+  # that is already plugged in keeps its old keymap until something re-triggers
+  # it. Without this the fix appears to do nothing until the next reboot.
+  sudo udevadm trigger --subsystem-match=input --action=change
+  ok "installed $HWDB_RULE"
+else
+  warn "could not install the remote keymap; the OK button will not select"
+fi
+
 # ------------------------------------------------------- desktop shortcut
 say "Adding the desktop shortcut"
 
@@ -281,4 +299,9 @@ cat <<EOM
     To leave the launcher: pick "Exit to Desktop" from the last tile, or
     press Ctrl+Alt+D. To come back: the Media Launcher icon on the Pi
     desktop, or Ctrl+Alt+D again.
+
+    On the remote: OK opens a tile, Home returns to the tiles, the back
+    arrow goes back a page, and Menu toggles the Pi desktop. Leave mouse
+    mode off; it turns OK into a mouse click and the arrows into cursor
+    movement.
 EOM

@@ -25,7 +25,14 @@ TEMPLATE = """    {begin}
     <!-- Kiosk windows swallow keystrokes, so a way back has to be bound at the
          compositor rather than in the page. A-F4 is a backstop that does not
          depend on the launcher daemon being healthy. C-A-d toggles between the
-         launcher and the Pi desktop. -->
+         launcher and the Pi desktop.
+
+         The remote control has no modifier keys, which puts every binding
+         above out of reach from the couch. Its Home button already sends
+         XF86HomePage; Menu is bound here as the remote's way to the desktop.
+         Its back arrow is deliberately absent: that key reaches the page as
+         BrowserBack, and index.html handles it so a service window can still
+         navigate back a page instead of being closed outright. -->
     <keybind key="A-Escape">
       <action name="Execute" command="{here}/back.sh" />
     </keybind>
@@ -36,6 +43,9 @@ TEMPLATE = """    {begin}
       <action name="Close" />
     </keybind>
     <keybind key="C-A-d">
+      <action name="Execute" command="{here}/desktop.sh" />
+    </keybind>
+    <keybind key="Menu">
       <action name="Execute" command="{here}/desktop.sh" />
     </keybind>
     {end}
