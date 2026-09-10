@@ -54,7 +54,7 @@
      Shown once when the shell window starts, not on every paint of this page.
      Coming back from the settings page is a fresh page load in the same
      window, and replaying a five second animation on the way back from
-     changing a colour would wear out fast. */
+     changing a color would wear out fast. */
   #splash {
     position: fixed;
     inset: 0;
@@ -202,7 +202,7 @@
     transition: transform 140ms ease, box-shadow 140ms ease;
   }
 
-  /* The tile's colour lives on a pseudo-element so the recede effect can be
+  /* The tile's color lives on a pseudo-element so the recede effect can be
      applied to the background alone. Filtering the tile itself would drain the
      logo with it, which turned every brand mark chalky. */
   .tile::before {
@@ -211,7 +211,7 @@
     inset: 0;
     z-index: 0;
     border-radius: inherit;
-    /* --surface is the tile face, --tint stays the brand colour for the glow.
+    /* --surface is the tile face, --tint stays the brand color for the glow.
        They were one value, which meant a red Netflix wordmark sat on a red
        tile and vanished the moment it lit up. */
     background: var(--surface, var(--tint));
@@ -225,7 +225,7 @@
   .tile.focused::before { filter: none; }
 
   /* Content dims by fading rather than desaturating, so an unfocused logo is
-     still recognisably its own colour. */
+     still recognisably its own color. */
   .tile .label,
   .tile .logo {
     opacity: var(--dim-opacity);

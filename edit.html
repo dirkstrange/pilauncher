@@ -85,7 +85,7 @@
     box-shadow: 0 0 0 4px rgba(76, 141, 255, 0.22);
   }
   /* A blue ring around a blue button is no ring at all. Anything already
-     wearing the accent colour gets its focus drawn in the text colour, which
+     wearing the accent color gets its focus drawn in the text color, which
      is the one thing guaranteed to contrast with it. */
   .primary:focus {
     border-color: var(--chalk);
@@ -127,6 +127,12 @@
     flex: none;
   }
 
+  /* Filling this row with the accent color left its subtitle as grey on
+     blue and cost it a visible focus ring. It reads better as an ordinary
+     row that happens to be marked in the accent: the plus and the title
+     carry it, and the contrast is the same as every other row here. */
+  .row.add .who b { color: var(--live); }
+
   .actions { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1em; }
   .primary { background: var(--live); color: #06122B; font-variation-settings: "wght" 500; }
   .danger  { background: transparent; border-color: var(--warn); color: var(--warn); }
@@ -135,7 +141,7 @@
   .field label { display: block; color: var(--haze); margin-bottom: 0.3em; }
   .field input, .field select { width: 100%; }
 
-  /* Four across because that is what fits a 4x4 board of colours without the
+  /* Four across because that is what fits a 4x4 board of colors without the
      swatches turning into targets you have to aim at from the sofa. */
   .swatches {
     display: grid;
@@ -165,7 +171,7 @@
     color: #06122B;
     font-variation-settings: "wght" 500;
   }
-  .colour-preview {
+  .color-preview {
     height: 4.2em;
     border-radius: 12px;
     display: grid;
@@ -174,13 +180,24 @@
     margin-bottom: 0.9em;
   }
 
+  /* Pinned to the bottom of the screen rather than the bottom of the page.
+     It used to sit below the fold, so "that site published no usable icon"
+     was written somewhere nobody could see and the button that said it looked
+     like it had simply done nothing. */
   #note {
-    margin-top: 1em;
-    min-height: 1.5em;
-    color: var(--haze);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    padding: 0.85em var(--safe-x);
+    background: var(--ink-raised);
+    border-top: 2px solid var(--live);
+    color: var(--chalk);
     line-height: 1.5;
   }
-  #note.bad { color: var(--warn); }
+  #note:empty { display: none; }
+  #note.bad { border-top-color: var(--warn); color: var(--warn); }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -193,7 +210,7 @@
 
   <!-- ---------- list view ---------- -->
   <section id="list-view">
-    <button class="row primary" id="add" type="button" data-nav>
+    <button class="row add" id="add" type="button" data-nav>
       <span class="swatch" style="background:#06122B;color:#4C8DFF">+</span>
       <span class="who"><b>Add a service</b><small>A web page, or an app already installed in Android</small></span>
     </button>
@@ -214,7 +231,7 @@
 
   <!-- ---------- form view ---------- -->
   <section id="form-view" hidden>
-    <div class="colour-preview" id="preview">Preview</div>
+    <div class="color-preview" id="preview">Preview</div>
 
     <div class="field">
       <label for="f-name">Name</label>
@@ -240,7 +257,7 @@
     </div>
 
     <div class="field">
-      <label>Colour</label>
+      <label>Color</label>
       <div class="swatches" id="palette"></div>
     </div>
 
@@ -249,7 +266,7 @@
       <div class="faces" id="faces">
         <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
         <button type="button" data-nav data-row="faces" data-face="light">Light</button>
-        <button type="button" data-nav data-row="faces" data-face="brand">The colour</button>
+        <button type="button" data-nav data-row="faces" data-face="brand">The color</button>
       </div>
     </div>
 
@@ -264,7 +281,7 @@
     </button>
 
     <div class="actions">
-      <button id="fetch" type="button" data-nav>Fetch logo and colours</button>
+      <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
       <button id="upload" type="button" data-nav>Upload a logo</button>
       <button id="drop-logo" type="button" data-nav>Remove logo</button>
     </div>
@@ -292,12 +309,12 @@
   let editing = null;      // the service being edited, or null when adding
   let logoUrl = null;      // logo for the service in the form, if it has one
   let isHidden = false;
-  let chosenColor = "";    // the brand colour, the one colour actually picked
+  let chosenColor = "";    // the brand color, the one color actually picked
   let face = "dark";       // what the tile face is made of: dark, light, brand
 
   // A board of sixteen instead of a hex box. Chosen to cover the streaming
   // brands already in the catalog and leave room either side, with two
-  // neutrals at the end for marks that carry their own colour.
+  // neutrals at the end for marks that carry their own color.
   const PALETTE = [
     "#E50914", "#FF5722", "#FF9800", "#FFC107",
     "#1CE783", "#01875F", "#00BCD4", "#00A8E1",
@@ -340,7 +357,7 @@
   }
 
   // Anything laid out as a block of buttons rather than a stack of fields:
-  // the colour board at four across, the tile face row at three. Movement
+  // the color board at four across, the tile face row at three. Movement
   // inside is by position, and running off the top or bottom hands over to
   // the field either side rather than stopping dead.
   function moveInGroup(key, selector, columns) {
@@ -368,7 +385,7 @@
     // three means left and right walk it while up and down always leave it.
     if (row.row === "faces") {
       if (e.key === "ArrowUp") {
-        // Back to the board, landing on the colour actually chosen rather
+        // Back to the board, landing on the color actually chosen rather
         // than on whichever swatch happens to come last in it.
         if (land(document.querySelector("[data-grid=palette][aria-pressed=true]")
               || document.querySelector("[data-grid=palette]"))) {
@@ -378,7 +395,7 @@
       }
       if (moveInGroup(e.key, "[data-row=faces]", 3)) { e.preventDefault(); return; }
     }
-    // The colour board is a grid, so it gets grid movement. The flat list
+    // The color board is a grid, so it gets grid movement. The flat list
     // below would walk it one swatch at a time, which is sixteen presses to
     // cross four rows.
     if (row.grid === "palette") {
@@ -504,23 +521,23 @@
       .join("").toUpperCase();
   }
 
-  // The face and the label colour both follow from the colour and the face
+  // The face and the label color both follow from the color and the face
   // choice, so neither is asked for. Readable text on a tile is arithmetic
   // rather than a decision worth handing to whoever is adding a service.
-  function faceColour() {
+  function faceColor() {
     if (!chosenColor) return "#06122B";
     if (face === "light") return "#FFFFFF";
     if (face === "brand") return chosenColor;
     return shade(chosenColor, 8);
   }
 
-  function inkColour() {
-    return luminance(faceColour()) > 0.6 ? "#101014" : "#FFFFFF";
+  function inkColor() {
+    return luminance(faceColor()) > 0.6 ? "#101014" : "#FFFFFF";
   }
 
   function inferFace(seed) {
     const bg = (seed.tile_bg || "").toUpperCase();
-    // No face colour at all means the tile is painted in the brand colour,
+    // No face color at all means the tile is painted in the brand color,
     // which is what the grid falls back to when tile_bg is missing.
     if (!bg || bg === (seed.color || "").toUpperCase()) return "brand";
     return luminance(bg) > 0.6 ? "light" : "dark";
@@ -529,11 +546,11 @@
   function renderPalette() {
     const box = $("palette");
     box.textContent = "";
-    const colours = PALETTE.slice();
-    // A colour read off a logo will rarely be one of the sixteen, so it joins
+    const colors = PALETTE.slice();
+    // A color read off a logo will rarely be one of the sixteen, so it joins
     // the board rather than being quietly rounded to the nearest.
-    if (chosenColor && !colours.includes(chosenColor)) colours.push(chosenColor);
-    colours.forEach(hex => {
+    if (chosenColor && !colors.includes(chosenColor)) colors.push(chosenColor);
+    colors.forEach(hex => {
       const swatch = document.createElement("button");
       swatch.type = "button";
       swatch.dataset.grid = "palette";
@@ -593,8 +610,8 @@
 
   function paint() {
     const box = $("preview");
-    box.style.background = faceColour();
-    box.style.color = inkColour();
+    box.style.background = faceColor();
+    box.style.color = inkColor();
     box.textContent = "";
     if (logoUrl) {
       const img = document.createElement("img");
@@ -650,8 +667,8 @@
     if (noteText) svc.note = noteText;
     if (chosenColor) {
       svc.color = chosenColor;
-      svc.tile_bg = faceColour();
-      svc.ink = inkColour();
+      svc.tile_bg = faceColor();
+      svc.ink = inkColor();
     }
     if (isHidden) svc.hidden = true;
     return svc;
@@ -709,7 +726,7 @@
       const res = await api("/logo", { id: id, url: url });
       logoUrl = res.logo;
       const guess = res.suggested || {};
-      // A colour already picked beats a guess, so this only fills an empty one.
+      // A color already picked beats a guess, so this only fills an empty one.
       if (guess.color && !chosenColor) {
         chosenColor = guess.color.toUpperCase();
         renderPalette();

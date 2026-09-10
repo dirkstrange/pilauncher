@@ -397,18 +397,18 @@ hidden and removed. It is a page in its own right rather than a panel drawn
 over the tiles, which is what lets the same editor answer a browser on another
 machine.
 
-A web service needs a name and an address. "Fetch logo and colours" then reads
+A web service needs a name and an address. "Fetch logo and colors" then reads
 the site for the largest icon it advertises, using the lookup in
-[scripts/fetch_logos.py](scripts/fetch_logos.py), and reads a brand colour off
-that image. A guess only fills a choice that is still empty, so a colour
+[scripts/fetch_logos.py](scripts/fetch_logos.py), and reads a brand color off
+that image. A guess only fills a choice that is still empty, so a color
 already picked survives one. Some sites publish nothing usable, Netflix among
 them, and those want an uploaded image instead.
 
-Colour is a board of sixteen rather than a hex field, on the grounds that
-nobody is typing `#E50914` with a d-pad. A colour read off a logo joins the
+Color is a board of sixteen rather than a hex field, on the grounds that
+nobody is typing `#E50914` with a d-pad. A color read off a logo joins the
 board as a seventeenth swatch rather than being rounded to the nearest of the
-sixteen. The tile face is a separate choice of dark, light, or the colour
-itself, and the label colour is worked out from whichever of those is picked
+sixteen. The tile face is a separate choice of dark, light, or the color
+itself, and the label color is worked out from whichever of those is picked
 rather than asked for.
 
 Android tiles work differently, because there is no site to read a logo from
@@ -518,7 +518,7 @@ reading a diff of it.
 }
 ```
 
-Set `hidden` to `true` to park an entry. It stays in the file with its colours
+Set `hidden` to `true` to park an entry. It stays in the file with its colors
 and notes intact but is left out of the tile grid, which is the tidier option
 for a service you have not set up yet. Hidden entries can still be launched by
 id with a direct POST to `/launch`, which is useful for testing one before

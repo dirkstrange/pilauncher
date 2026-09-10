@@ -409,7 +409,7 @@ def validate_service(raw: dict) -> dict:
         if not value:
             continue
         if not HEX_RE.match(value):
-            raise ValueError(field + " must be a colour like #1A2B3C")
+            raise ValueError(field + " must be a color like #1A2B3C")
         svc[field] = value.upper()
 
     for field in ("note", "user_agent"):
@@ -487,7 +487,7 @@ def fetch_logo(svc: dict) -> None:
 
 
 def palette_from_logo(path: Path) -> dict:
-    """Guess tile colours from a logo.
+    """Guess tile colors from a logo.
 
     A suggestion only: the settings page fills the fields in and lets them be
     changed afterwards. Pillow is optional, so a box without it gets no guess.
@@ -497,7 +497,7 @@ def palette_from_logo(path: Path) -> dict:
     except ImportError:
         return {}
     counts: dict[tuple[int, int, int], int] = {}
-    coloured: dict[tuple[int, int, int], int] = {}
+    colored: dict[tuple[int, int, int], int] = {}
     try:
         with Image.open(path) as img:
             img = img.convert("RGBA")
@@ -512,23 +512,23 @@ def palette_from_logo(path: Path) -> dict:
                 # with the rest reliably returns the background rather than
                 # the brand, which is what a first attempt at this did.
                 if max(red, green, blue) - min(red, green, blue) >= 40:
-                    coloured[bucket] = coloured.get(bucket, 0) + 1
+                    colored[bucket] = colored.get(bucket, 0) + 1
     except (OSError, ValueError):
         return {}
-    # Fall back to the greys only for a logo that genuinely has no colour in
+    # Fall back to the greys only for a logo that genuinely has no color in
     # it, so a black-and-white mark still produces something usable.
-    counts = coloured or counts
+    counts = colored or counts
     if not counts:
         return {}
     red, green, blue = (v * 32 + 16 for v in max(counts, key=lambda k: counts[k]))
-    # sRGB luminance weights, deciding whether a label sitting on this colour
+    # sRGB luminance weights, deciding whether a label sitting on this color
     # should be black or white.
     luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
     return {
         "color": "#%02X%02X%02X" % (red, green, blue),
         "ink": "#000000" if luminance > 0.6 else "#FFFFFF",
         # Tile backgrounds in this catalog are near-black shades of the brand
-        # colour, which keeps a wall of them calm on a big screen.
+        # color, which keeps a wall of them calm on a big screen.
         "tile_bg": "#%02X%02X%02X" % (red // 8, green // 8, blue // 8),
     }
 
@@ -784,7 +784,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/services.json":
             # Hidden entries stay in the catalog but off the screen. They are
             # still launchable by id, so a service can be parked without
-            # losing its colours and notes.
+            # losing its colors and notes.
             visible = with_logos([s for s in load_services() if not s.get("hidden")])
             self._send(200, json.dumps(visible).encode(), "application/json")
         elif path == "/edit":
