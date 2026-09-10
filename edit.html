@@ -84,6 +84,13 @@
     border-color: var(--live);
     box-shadow: 0 0 0 4px rgba(76, 141, 255, 0.22);
   }
+  /* A blue ring around a blue button is no ring at all. Anything already
+     wearing the accent colour gets its focus drawn in the text colour, which
+     is the one thing guaranteed to contrast with it. */
+  .primary:focus {
+    border-color: var(--chalk);
+    box-shadow: 0 0 0 4px rgba(237, 239, 244, 0.3);
+  }
 
   .row {
     display: flex;
