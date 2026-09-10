@@ -28,6 +28,7 @@ Environment overrides:
     PILAUNCHER_PROFILES   profile root directory
     PILAUNCHER_PORT       listen port             (default: 8800)
     PILAUNCHER_SHELL_UNIT systemd unit for the launcher's own window
+    PILAUNCHER_WLOPM      tool that powers the panel down  (default: wlopm)
     PILAUNCHER_WAYDROID   waydroid binary         (default: waydroid)
     PILAUNCHER_WAYDROID_STOP  root helper that stops an Android app
     PILAUNCHER_CDM_SEED   Widevine CDM copied into each new profile
@@ -84,11 +85,15 @@ SERVICES_FILE = Path(
 # to every address but this one regardless, so opening that door lets the
 # network edit the catalog without handing it a remote control for the TV.
 BIND = os.environ.get("PILAUNCHER_BIND", HOST)
-LOCAL_ONLY = frozenset({"/launch", "/close", "/desktop"})
+LOCAL_ONLY = frozenset({"/launch", "/close", "/desktop", "/display"})
 # Enough for a generous PNG, small enough that a mistyped upload cannot
 # fill the card.
 LOGO_MAX_BYTES = 2 * 1024 * 1024
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
+# install.sh already puts wlopm in the labwc autostart, where it runs once to
+# turn the panel ON and stop the desktop blanking a film. This is the other
+# direction, for the screensaver.
+WLOPM = os.environ.get("PILAUNCHER_WLOPM", "wlopm")
 # Android services are launched through waydroid. Launching works as the
 # desktop user, but stopping an app needs "waydroid shell", which insists on
 # root, so that one step goes through a root-owned helper permitted by a
@@ -710,6 +715,11 @@ def stop_android_app(pkg: str) -> bool:
 
 def start_service(svc: dict) -> int:
     global _proc
+    # Opening something is the clearest possible sign that a person is here,
+    # so it is also the safest place to undo a blanked panel. Covers the case
+    # where the screensaver turned the screen off and the page then failed to
+    # turn it back on for any reason.
+    wake_display()
     stop_current()
 
     if svc.get("kind") == "android":
@@ -889,6 +899,35 @@ def stop_shell() -> bool:
     return _shell_unit("stop")
 
 
+def set_display(on: bool) -> bool:
+    """Power the TV panel on or off through wlopm.
+
+    Only the panel. The compositor keeps running and keeps delivering input,
+    which is the whole reason this is safe: a dark screen is still a screen
+    that reacts to the remote, and the first keypress turns it back on.
+    """
+    try:
+        subprocess.run(
+            [WLOPM, "--on" if on else "--off", "*"],
+            check=True, timeout=10, capture_output=True,
+        )
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def wake_display() -> None:
+    """Force the panel on, unconditionally.
+
+    Called from every route that means a person is doing something, so that no
+    single failure can leave a black television with no way back. wlopm turning
+    on an output that is already on is a no-op, so the cost of calling this
+    more often than strictly necessary is one cheap subprocess on a path that
+    already starts a browser.
+    """
+    set_display(True)
+
+
 def service_running() -> bool:
     with _lock:
         # An Android app counts as running even though we hold no process for
@@ -1061,7 +1100,17 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": str(exc)})
                 return
             self._json(200, {"launched": svc["id"], "pid": pid})
+        elif path == "/display":
+            # The tile page asks for this. It is the only thing that knows how
+            # long the screensaver has been up, and it is also the thing that
+            # sees the keypress ending it.
+            on = bool(payload.get("on", True))
+            if not set_display(on):
+                self._json(500, {"error": f"{WLOPM} could not change the panel"})
+                return
+            self._json(200, {"display": "on" if on else "off"})
         elif path == "/close":
+            wake_display()
             closed = stop_current()
             # Unconditional, not just for Android. Starting a unit that is
             # already running is a no-op, and the alternative is tracking
@@ -1086,6 +1135,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self._json(200, {"saved": len(ids)})
         elif path == "/desktop":
+            # Leaving for the desktop hands control to something that knows
+            # nothing about the screensaver, so the panel has to be on before
+            # the tiles stop being the thing on screen.
+            wake_display()
             if stop_shell():
                 self._json(200, {"desktop": True})
             else:
@@ -1189,6 +1242,10 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+    # The daemon can be restarted while the screensaver has the panel off, and
+    # the page that knew about it is gone by the time we are back. Start from a
+    # lit screen rather than inherit a dark one nobody remembers turning off.
+    wake_display()
     server = ThreadingHTTPServer((BIND, PORT), Handler)
     server.daemon_threads = True
     print(f"pilauncher listening on http://{BIND}:{PORT}", flush=True)

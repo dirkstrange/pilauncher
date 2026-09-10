@@ -541,6 +541,40 @@ stacked taskbars on the desktop is what that looks like.
 
 Also disable the desktop screensaver in `raspi-config` under Display Options.
 
+### Turning the panel off on purpose
+
+The setting above exists so nothing blanks the screen during a film. The
+launcher then does its own blanking, on its own schedule, because it is the
+only thing on the box that knows whether a film is playing.
+
+The sequence on an idle evening is ten minutes to the screensaver, thirty
+minutes of pictures, then the panel powers down. Any key brings it back. Both
+numbers are `IDLE_MS` and `PANEL_OFF_MS` at the top of the screensaver block in
+`index.html`.
+
+Nothing here can fire while something is playing. `checkIdle()` asks the daemon
+whether a service is open before it will start the screensaver at all, and the
+blanking timer is only armed once the screensaver has actually started, so a
+long film cannot reach it.
+
+A web page cannot power down a display, so the page asks the daemon through
+`POST /display` and the daemon runs `wlopm`. That route is in `LOCAL_ONLY`
+alongside `/launch` and `/close`: blanking the television is TV control, not
+catalog editing, and the settings page open on a laptop has no business doing
+it.
+
+The failure that matters is a dark screen with nothing left to light it, so
+there are four ways back rather than one. Any keypress or pointer movement,
+which is the normal one. Opening anything, since `start_service()` wakes the
+panel before it does anything else. `/close` and `/desktop`, which cover the
+remote's Home and Menu buttons. And loading the page, which covers a shell
+restart while the screen was dark, plus daemon startup, which covers the daemon
+being restarted while the page that knew about it is gone.
+
+`wlopm` powers down the output only. The compositor keeps running and keeps
+delivering input to the page underneath, which is what makes a dark screen
+safe: it is still a screen that reacts to the remote.
+
 ## What a boot with the TV off breaks
 
 A television is not a monitor. It gets switched off, it gets switched to the

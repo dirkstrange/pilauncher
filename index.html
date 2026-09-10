@@ -1018,6 +1018,13 @@
   const IDLE_MS = 10 * 60 * 1000;   // idle time on the tile screen before it starts
   const SLIDE_MS = 45 * 1000;       // how long each picture holds
   const BUSY_MS = 30 * 1000;        // recheck interval while a service is open
+  // Measured from the moment the screensaver starts, not from the last
+  // keypress, so the panel goes dark 40 minutes into an idle evening. The
+  // pictures are the point for the first half hour; after that the room has
+  // clearly been empty for a while and a lit 65in panel is just burn-in and
+  // electricity. Nothing here can fire while a service is open, because
+  // checkIdle refuses to start the screensaver at all in that case.
+  const PANEL_OFF_MS = 30 * 60 * 1000;
 
   const saver = document.getElementById("saver");
   const frames = [document.getElementById("frameA"), document.getElementById("frameB")];
@@ -1026,10 +1033,23 @@
 
   let idleTimer = null;
   let slideTimer = null;
+  let panelTimer = null;
   let shots = [];
   let shot = 0;
   let frameOn = 0;
   let saverOn = false;
+  let panelOff = false;
+
+  // The page cannot power a display down by itself, so the daemon does it.
+  // Failures are swallowed on purpose: a screensaver that throws because the
+  // panel would not blank is worse than one that stays lit.
+  function setPanel(on) {
+    return fetch("/display", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ on: on })
+    }).then(() => { panelOff = !on; }).catch(() => {});
+  }
 
   function paintTime() {
     saverTime.textContent = new Date().toLocaleTimeString("en-US", {
@@ -1075,8 +1095,19 @@
         paintTime();
         nextShot();
         slideTimer = setInterval(nextShot, SLIDE_MS);
+        panelTimer = setTimeout(blankPanel, PANEL_OFF_MS);
       })
       .catch(() => {});
+  }
+
+  // Half an hour of pictures is enough. Stop crossfading before powering the
+  // panel down, since decoding a new photograph every 45 seconds for a screen
+  // that is off is work nobody will ever see.
+  function blankPanel() {
+    if (!saverOn) return;
+    clearInterval(slideTimer);
+    slideTimer = null;
+    setPanel(false);
   }
 
   function stopSaver() {
@@ -1086,6 +1117,12 @@
     saver.setAttribute("aria-hidden", "true");
     clearInterval(slideTimer);
     slideTimer = null;
+    clearTimeout(panelTimer);
+    panelTimer = null;
+    // Unconditional rather than guarded on panelOff. The flag is this page's
+    // belief about the panel and the panel is the one thing that must not be
+    // left dark, so the cheap request wins over the tidy condition.
+    setPanel(true);
     frames.forEach(f => f.classList.remove("show"));
   }
 
@@ -1135,8 +1172,13 @@
       poke();
     }, true);
   });
-  setInterval(() => { if (saverOn) paintTime(); }, 15000);
+  setInterval(() => { if (saverOn && !panelOff) paintTime(); }, 15000);
   poke();
+
+  // This page is the only thing that remembers the panel was blanked, so a
+  // reload while it is dark would strand the screen with nothing left to turn
+  // it back on. Loading is therefore treated as a reason to light it.
+  setPanel(true);
 
   // Reveal the cursor only once a pointing device is actually used, so an
   // air mouse works without leaving a stray arrow on screen the rest of the time.
