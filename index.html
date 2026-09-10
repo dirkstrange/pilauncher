@@ -29,7 +29,10 @@
     --live-ring:  var(--magenta);
     --safe-x: 4.5vw;
     --safe-y: 4vh;
-    --gap: 1.2vw;
+    /* The focused tile grows 7% and then carries a ring 11px beyond that, so
+       the gap has to clear both. At 1.2vw the ring landed exactly on its
+       neighbour. This leaves about 22px of air around it. */
+    --gap: 2.3vw;
 
     /* How far the rest of the grid recedes while one tile is being moved.
        Ordinary focus dims nothing at all: the ring says which tile is
