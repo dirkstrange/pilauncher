@@ -109,6 +109,31 @@ end. Protected content will not play at all under Waydroid, which has no
 Widevine of its own. If any of that matters to you, read "Known ceilings" in
 the technical notes before spending an evening on this.
 
+## License
+
+GPLv3. The full text is in [LICENSE](LICENSE). Fork it, change it, run it on
+whatever you like. The one condition is that if you distribute a modified
+version, that version has to be free software under the same terms, so
+improvements stay available to everyone who receives them.
+
+The Strange Media name and the marks in [design/](design/) are not covered.
+They identify this project rather than being part of it, so a fork wants its
+own name on it.
+
+## Trademarks
+
+Netflix, Prime Video, Disney+, Max, Hulu, Paramount+, Peacock, Apple TV,
+Crunchyroll, Twitch, Spotify, Tubi, Pluto TV, Starz, YouTube and the Play
+Store are trademarks of their respective owners. This project is not
+affiliated with, endorsed by, or connected to any of them.
+
+No service artwork is distributed here. The `.gitignore` deliberately
+excludes image files so a logo cannot be committed by accident, and
+[scripts/fetch_logos.py](scripts/fetch_logos.py) pulls each one onto your own
+machine at install time instead. The screenshots on this page show those
+logos as they appear on screen, which is what a screenshot of a working
+launcher looks like.
+
 ## The details
 
 [docs/TECHNICAL.md](docs/TECHNICAL.md) has everything this page leaves out.
