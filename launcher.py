@@ -91,7 +91,6 @@ LOGO_DIR = Path(os.environ.get("PILAUNCHER_LOGOS", PROFILE_ROOT.parent / "logos"
 # network, no API key, and cannot be rate limited or discontinued. NASA's
 # picture-of-the-day feed is the fallback so the feature works out of the box.
 WALLPAPER_DIR = Path(os.environ.get("PILAUNCHER_WALLPAPERS", PROFILE_ROOT.parent / "screensaver"))
-WALLPAPER_CACHE = WALLPAPER_DIR / ".remote-cache.json"
 NASA_KEY = os.environ.get("PILAUNCHER_NASA_KEY", "DEMO_KEY")
 CACHE_MAX_AGE = 22 * 60 * 60      # a day's worth, well inside DEMO_KEY limits
 # Which feeds to draw from, in order. Everything here works without an API key
@@ -265,16 +264,28 @@ FEED_FUNCS = {
 }
 
 
-def remote_wallpapers() -> list[str]:
-    """Image URLs from the configured feeds, cached to disk for a day.
+def wallpaper_cache(feeds: list[str]) -> Path:
+    """Cache file for one set of feeds.
+
+    Named after the set, because the backdrop asks for Bing alone while the
+    screensaver takes whatever is configured, and one shared file would have
+    each of them serving the other's answer.
+    """
+    return WALLPAPER_DIR / (".cache-" + "-".join(sorted(feeds)) + ".json")
+
+
+def remote_wallpapers(feeds: list[str] | None = None) -> list[str]:
+    """Image URLs from the given feeds, cached to disk for a day.
 
     Batched deliberately: a slideshow changing every half minute would exhaust
     a shared API key within the hour, while one request per feed per day does
     not come close. A stale cache is preferred over an empty screen when the
     network is down.
     """
+    feeds = feeds or WALLPAPER_FEEDS
+    cache_file = wallpaper_cache(feeds)
     try:
-        cached = json.loads(WALLPAPER_CACHE.read_text(encoding="utf-8"))
+        cached = json.loads(cache_file.read_text(encoding="utf-8"))
         fresh = time.time() - cached.get("fetched", 0) < CACHE_MAX_AGE
         if fresh and cached.get("urls"):
             return cached["urls"]
@@ -282,7 +293,7 @@ def remote_wallpapers() -> list[str]:
         cached = {}
 
     urls: list[str] = []
-    for name in WALLPAPER_FEEDS:
+    for name in feeds:
         func = FEED_FUNCS.get(name)
         if func is None:
             continue
@@ -302,7 +313,7 @@ def remote_wallpapers() -> list[str]:
 
     try:
         WALLPAPER_DIR.mkdir(parents=True, exist_ok=True)
-        WALLPAPER_CACHE.write_text(
+        cache_file.write_text(
             json.dumps({"fetched": time.time(), "urls": urls}), encoding="utf-8"
         )
     except OSError:
@@ -853,15 +864,25 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 self._json(500, {"error": "could not read logo"})
         elif path == "/wallpapers":
-            local = local_wallpapers()
-            # Local images win outright. Someone who put pictures in the folder
-            # wants those, not whatever the feed happens to be serving.
-            urls = local if local else remote_wallpapers()
+            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            asked = [
+                f for f in (query.get("feeds", [""])[0] or "").split(",")
+                if f in FEED_FUNCS
+            ]
+            if asked:
+                # An explicit request is answered literally. Local images
+                # override the default set below, but asking for Bing and
+                # being handed the contents of a folder would be a puzzle.
+                urls = remote_wallpapers(asked)
+                source = ",".join(asked)
+            else:
+                local = local_wallpapers()
+                # Local images win outright. Someone who put pictures in the
+                # folder wants those, not whatever the feed is serving.
+                urls = local if local else remote_wallpapers()
+                source = "local" if local else ",".join(WALLPAPER_FEEDS)
             random.shuffle(urls)
-            self._json(200, {
-                "urls": urls,
-                "source": "local" if local else ",".join(WALLPAPER_FEEDS),
-            })
+            self._json(200, {"urls": urls, "source": source})
         elif path.startswith("/wallpaper/"):
             name = path[len("/wallpaper/"):]
             target = (WALLPAPER_DIR / name).resolve()

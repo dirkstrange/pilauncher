@@ -55,7 +55,31 @@
   }
   body.pointer { cursor: default; }
 
+  /* Bing's picture of the day, soft and well back, so the grid has
+     something behind it without competing with twenty brand colors. The
+     frames sit slightly outside the viewport because a blur samples past
+     its own edges and would otherwise show a pale border. */
+  #backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: var(--ink);
+  }
+  .bd-frame {
+    position: absolute;
+    inset: -3%;
+    background-size: cover;
+    background-position: center;
+    filter: blur(9px) saturate(0.85);
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+  .bd-frame.show { opacity: 0.3; }
+
   #shell {
+    position: relative;
+    z-index: 1;
     height: 100%;
     padding: var(--safe-y) var(--safe-x);
     display: grid;
@@ -478,6 +502,10 @@
 </style>
 </head>
 <body>
+<div id="backdrop" aria-hidden="true">
+  <div class="bd-frame" id="bdA"></div>
+  <div class="bd-frame" id="bdB"></div>
+</div>
 <div id="splash" aria-hidden="true">
   <div class="splash-lockup">
     <svg class="mark" viewBox="0 0 64 64">
@@ -564,6 +592,51 @@
   // rather than any tile, which is how it stays reachable without a pointer.
   const GEAR = -1;
   const gear = document.getElementById("gear");
+
+  /* ---------- backdrop ---------- */
+  (() => {
+    const frames = [document.getElementById("bdA"), document.getElementById("bdB")];
+    if (!frames[0]) return;
+    const HOUR = 60 * 60 * 1000;
+    let shots = [];
+    let at = 0;
+    let on = 0;
+
+    function next() {
+      if (!shots.length) return;
+      const url = shots[at % shots.length];
+      at += 1;
+      const incoming = frames[on ^ 1];
+      // Decoded before it is shown, or the crossfade reveals a half-painted
+      // image and the whole point of a slow fade is lost.
+      const pre = new Image();
+      pre.onload = () => {
+        incoming.style.backgroundImage = 'url("' + url + '")';
+        incoming.classList.add("show");
+        frames[on].classList.remove("show");
+        on ^= 1;
+      };
+      pre.onerror = () => {
+        shots = shots.filter(u => u !== url);
+        if (shots.length) next();
+      };
+      pre.src = url;
+    }
+
+    // Bing alone rather than the screensaver's mix. Its pictures are
+    // landscapes shot to sit behind something, which is exactly the job.
+    fetch("/wallpapers?feeds=bing")
+      .then(r => r.json())
+      .then(data => {
+        shots = (data && data.urls) || [];
+        next();
+        // Bing publishes eight, so an hourly change works through a day of
+        // them before repeating. The feed itself is cached for a day, so
+        // this costs nothing after the first fetch.
+        setInterval(next, HOUR);
+      })
+      .catch(() => {});
+  })();
 
   /* ---------- splash ---------- */
   (() => {
