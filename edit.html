@@ -138,6 +138,10 @@
   .row.add .who b { color: var(--live); }
 
   .actions { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1em; }
+  /* Sits under the preview it acts on, so the logo controls read as one
+     group rather than as three fields of distance. */
+  .logo-actions { margin-top: 0.6em; }
+  .color-board .actions { margin-top: 0.6em; }
   .primary { background: var(--live); color: #06323E; font-variation-settings: "wght" 500; }
   .danger  { background: transparent; border-color: var(--warn); color: var(--warn); }
 
@@ -363,6 +367,9 @@
             <option value="logo">From logo</option>
           </select>
           <div class="swatches" id="palette"></div>
+          <div class="actions">
+            <button id="eyedropper" type="button" data-nav hidden>Pick a color off the screen</button>
+          </div>
         </div>
         <div class="color-side">
           <div class="logo-size" id="logo-size" hidden>
@@ -371,6 +378,12 @@
           </div>
           <div class="tile-previews">
             <div class="tile-preview" id="preview-on"></div>
+          </div>
+          <div class="actions logo-actions">
+            <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
+            <button id="upload" type="button" data-nav>Upload a logo</button>
+            <button id="drop-logo" type="button" data-nav>Remove logo</button>
+            <button class="toggle" id="shadow-toggle" type="button" data-nav hidden>Logo shadow: on</button>
           </div>
         </div>
       </div>
@@ -386,14 +399,6 @@
       <span class="swatch" id="hidden-mark" style="background:#06323E;color:#79839B">&#10003;</span>
       <span class="who"><b id="hidden-label">Shown on the launcher</b><small>Hidden tiles stay in the catalog and keep their settings</small></span>
     </button>
-
-    <div class="actions">
-      <button id="eyedropper" type="button" data-nav hidden>Pick a color off the screen</button>
-      <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
-      <button id="upload" type="button" data-nav>Upload a logo</button>
-      <button id="drop-logo" type="button" data-nav>Remove logo</button>
-      <button class="toggle" id="shadow-toggle" type="button" data-nav hidden>Logo shadow: on</button>
-    </div>
 
     <div class="actions">
       <button class="primary" id="save" type="button" data-nav>Save</button>
