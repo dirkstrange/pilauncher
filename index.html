@@ -345,8 +345,8 @@
   .tile.focused {
     transform: scale(1.07);
     z-index: 2;
-    outline: 3px solid var(--chalk);
-    outline-offset: 5px;
+    outline: 5px solid var(--cyan);
+    outline-offset: 6px;
     box-shadow: 0 18px 36px -20px rgba(0, 0, 0, 0.9);
     /* Promoted only while focused. On all twenty at once this would be twenty
        compositor layers for no gain. */
@@ -359,8 +359,8 @@
   .tile.moving {
     z-index: 3;
     transform: scale(1.12) rotate(-1.4deg);
-    outline: 3px solid var(--live-ring);
-    outline-offset: 6px;
+    outline: 5px solid var(--live-ring);
+    outline-offset: 7px;
     box-shadow: 0 28px 56px -24px rgba(0, 0, 0, 0.95);
     cursor: grabbing;
   }
@@ -392,10 +392,12 @@
     height: 4.4vh;
   }
   #note {
-    font-size: clamp(13px, 1.05vw, 21px);
+    /* 24px on the 1080 screen this runs on, still scaling on anything else. */
+    font-size: clamp(15px, 1.25vw, 24px);
     font-variation-settings: "wdth" 100, "wght" 500;
     color: var(--chalk);
-    opacity: 0.8;
+    opacity: 0.85;
+    letter-spacing: 0.01em;
     line-height: 1.2;
     text-align: center;
     white-space: nowrap;
