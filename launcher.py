@@ -350,6 +350,7 @@ PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*([.][A-Za-z][A-Za-z0-9_]*)+$")
 CATALOG_FIELDS = frozenset({
     "id", "name", "url", "color", "ink", "tile_bg", "note",
     "kind", "package", "user_agent", "extra_flags", "hidden", "logo_shadow",
+    "logo_scale",
 })
 
 
@@ -429,6 +430,21 @@ def validate_service(raw: dict) -> dict:
     # explicit true into every entry would be noise in the file.
     if raw.get("logo_shadow") is False:
         svc["logo_shadow"] = False
+
+    # How large the logo sits inside its tile, as a multiple of the size every
+    # tile uses. Artwork arrives with wildly different amounts of padding
+    # baked into its own bounding box, so one cap cannot suit all of it.
+    scale = raw.get("logo_scale")
+    if scale is not None:
+        try:
+            value = float(scale)
+        except (TypeError, ValueError):
+            raise ValueError("logo_scale must be a number")
+        if not 0.4 <= value <= 1.4:
+            raise ValueError("logo_scale must be between 0.4 and 1.4")
+        # Left out when it is the default, so the file stays readable.
+        if abs(value - 1.0) > 0.001:
+            svc["logo_scale"] = round(value, 2)
     return svc
 
 

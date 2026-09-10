@@ -317,8 +317,11 @@
      centred at the same weight, so a text tile reads as its own treatment
      rather than as a logo that failed to arrive. */
   .tile .logo {
-    max-width: 78%;
-    max-height: 62%;
+    /* The cap every tile shares, times whatever that service set for
+       itself. Artwork arrives with different amounts of padding baked into
+       its own bounding box, so one number cannot suit all of it. */
+    max-width: calc(78% * var(--logo-scale, 1));
+    max-height: calc(62% * var(--logo-scale, 1));
     object-fit: contain;
     /* Lifts flat marks off a saturated tile without touching photographic
        icons noticeably. */
@@ -758,6 +761,7 @@
       btn.style.setProperty("--tint", svc.color || "#2A3040");
       btn.style.setProperty("--tint-ink", svc.ink || "#FFFFFF");
       if (svc.tile_bg) btn.style.setProperty("--surface", svc.tile_bg);
+      if (svc.logo_scale) btn.style.setProperty("--logo-scale", svc.logo_scale);
       btn.setAttribute("role", "option");
 
       const label = document.createElement("span");

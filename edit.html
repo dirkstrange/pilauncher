@@ -248,8 +248,8 @@
   .tile-preview.dimmed .pv-label { opacity: 0.9; }
   .tile-preview > * { position: relative; z-index: 1; }
   .tile-preview img {
-    max-width: 93%;
-    max-height: 87%;
+    max-width: calc(78% * var(--logo-scale, 1));
+    max-height: calc(62% * var(--logo-scale, 1));
     object-fit: contain;
     filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
     cursor: crosshair;
@@ -265,6 +265,21 @@
   .picker-hint {
     color: var(--haze);
     font-size: 0.85em;
+  }
+  .logo-size label {
+    display: block;
+    color: var(--haze);
+    margin-bottom: 0.25em;
+  }
+  .logo-size #scale-value { color: var(--chalk); }
+  /* Left and right change the value, which is what a range does natively and
+     what the d-pad sends. Nothing here intercepts those, unlike the color
+     board above. */
+  .logo-size input[type=range] {
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    accent-color: var(--live);
   }
 
   /* Pinned to the bottom of the screen rather than the bottom of the page.
@@ -354,6 +369,10 @@
           <div class="swatches" id="palette"></div>
         </div>
         <div class="color-side">
+          <div class="logo-size" id="logo-size" hidden>
+            <label for="f-scale">Logo size <span id="scale-value">100%</span></label>
+            <input id="f-scale" type="range" min="0.4" max="1.4" step="0.05" value="1" data-nav>
+          </div>
           <div class="tile-previews">
             <figure>
               <div class="tile-preview" id="preview-on"></div>
@@ -414,6 +433,7 @@
   let chosenColor = "";    // the tile color itself, exactly as it will appear
   let tab = "dark";        // which board is showing: dark faces or light ones
   let logoShadow = true;   // whether the tile lifts its logo with a shadow
+  let logoScale = 1;       // how large the logo sits inside its tile
   let glow = "";           // the brand color the launcher glows when focused
   let logoColors = [];     // colors read out of the logo now in the preview
   let sampledFrom = null;  // the logo those came from, so it is read once
@@ -779,6 +799,12 @@
     set.value = tab;
   }
 
+  function setScale(value) {
+    logoScale = value;
+    $("f-scale").value = String(value);
+    $("scale-value").textContent = Math.round(value * 100) + "%";
+  }
+
   function setShadow(value) {
     logoShadow = value;
     // Said in words as well as shown by the fill, since a button that is only
@@ -835,6 +861,7 @@
       const box = $(id);
       box.textContent = "";
       box.style.setProperty("--face", face);
+      box.style.setProperty("--logo-scale", String(logoScale));
       box.style.color = ink;
       if (!logoUrl) {
         const label = document.createElement("span");
@@ -882,6 +909,7 @@
         + "Colors found in it are under From logo.";
     }
     $("shadow-toggle").hidden = !logoUrl;
+    $("logo-size").hidden = !logoUrl;
   }
 
   function showForm(svc) {
@@ -910,6 +938,7 @@
     $("remove").hidden = !editing;
     setHidden(Boolean(seed.hidden));
     setShadow(seed.logo_shadow !== false);
+    setScale(Number(seed.logo_scale) || 1);
     fillPackages(seed.package || "");
     onKind();
     paint();
@@ -944,6 +973,7 @@
     // Written only when switched off, since a shadow is the default and an
     // explicit true in every entry would be noise in the file.
     if (!logoShadow) svc.logo_shadow = false;
+    if (Math.abs(logoScale - 1) > 0.001) svc.logo_scale = logoScale;
     return svc;
   }
 
@@ -961,6 +991,10 @@
   });
   $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
   $("shadow-toggle").addEventListener("click", () => repaintShadow(!logoShadow));
+  $("f-scale").addEventListener("input", e => {
+    setScale(Number(e.target.value));
+    paint();
+  });
   $("f-name").addEventListener("input", paint);
 
   $("save").addEventListener("click", async () => {

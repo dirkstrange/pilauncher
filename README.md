@@ -530,12 +530,31 @@ reading a diff of it.
   "url": "https://example.com",
   "color": "#3355FF",
   "ink": "#FFFFFF",
-  "note": "Shown at the bottom of the screen when focused.",
+  "note": "Catalog documentation. Not shown on screen.",
+  "tile_bg": "#101014",
+  "logo_shadow": false,
+  "logo_scale": 1.2,
   "user_agent": "optional override",
   "extra_flags": ["--optional-chromium-flag"],
   "hidden": false
 }
 ```
+
+`tile_bg` is the face of the tile and `color` the brand color the launcher
+glows around it when focused; `ink` is the label, used only where there is no
+logo to cover it.
+
+`logo_shadow` and `logo_scale` both exist because artwork does not arrive in a
+consistent state. A drop shadow lifts a flat mark off a saturated face and
+does the opposite to one that already carries its own edge, so it is per tile
+and defaults to on. `logo_scale` multiplies the size every logo is drawn at,
+which is worth having because each image bakes a different amount of padding
+into its own bounding box: two logos capped identically can still look nothing
+like the same size. It defaults to 1 and both are left out of the file when
+they are at their default.
+
+The strip below the grid shows the focused service's name, not its `note`.
+Notes are documentation for whoever reads the catalog.
 
 Set `hidden` to `true` to park an entry. It stays in the file with its colors
 and notes intact but is left out of the tile grid, which is the tidier option
