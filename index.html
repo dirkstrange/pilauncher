@@ -693,6 +693,11 @@
       clearTimeout(holdTimer);
       holdTimer = null;
       if (!holdFired && moving < 0) open();
+    } else if (cursor === GEAR && moving < 0) {
+      // Hold-to-rearrange only applies to tiles, so nothing arms a timer for
+      // the corner control and the branch above never fires for it. Without
+      // this the gear opens with a pointer and ignores Enter.
+      open();
     }
     e.preventDefault();
   });
