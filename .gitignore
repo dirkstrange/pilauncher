@@ -24,14 +24,6 @@ shell/
 # Pironman case OLED. It is deliberately kept and deliberately untracked, so do
 # not delete it as clutter. Being ignored, git is NOT a backup of it.
 
-# The artwork the launcher draws itself with is not a stray either, and unlike
-# the case above it has to reach the Pi, so both files are tracked in spite of
-# the rule up there. logo-full.png is the startup splash and logo-small.png the
-# mark in the header. Both were drawn for this project rather than borrowed
-# from a service, which is the whole point of the rule they are exempt from.
-!logo-full.png
-!logo-small.png
-
 # design/ is the brand kit: the marks, the tokens and the sheet they are
 # documented on. The rule above exists to catch a service logo dropped in on
 # its way to the Pi, which is the opposite of this. The launcher inlines these

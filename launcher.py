@@ -833,14 +833,6 @@ class Handler(BaseHTTPRequestHandler):
             # the Play Store becomes a tile without anyone typing a package
             # name, which is the one field that fails silently when wrong.
             self._send(200, json.dumps(android_apps()).encode(), "application/json")
-        elif path in ("/logo-full.png", "/logo-small.png"):
-            # The artwork the launcher wears itself, kept in the checkout
-            # rather than the logo directory: that one holds per-service
-            # images the settings page rewrites, and these are part of the app.
-            try:
-                self._send(200, (BASE / path[1:]).read_bytes(), "image/png")
-            except OSError:
-                self._json(404, {"error": "no such image"})
         elif path == "/catalog":
             # Everything, hidden entries included, which is what the settings
             # page edits. /services.json stays the filtered view the tiles use.
