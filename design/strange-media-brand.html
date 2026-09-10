@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strange Media brand preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,400;112,500;112,600;112,700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --sm-cyan:     #23C9F2;
+  --sm-magenta:  #E736C8;
+  --sm-ink:      #F2F4F8;
+  --sm-ink-dim:  rgba(242, 244, 248, 0.45);
+  --sm-page:     #0C0F15;
+  --sm-surface:  #161A22;
+  --sm-hairline: rgba(255, 255, 255, 0.07);
+  --sm-font: 'Archivo', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 40px;
+  background: var(--sm-page);
+  color: var(--sm-ink);
+  font-family: var(--sm-font);
+  font-variation-settings: 'wdth' 100, 'wght' 400;
+}
+h2 {
+  font-size: 12px;
+  font-variation-settings: 'wdth' 100, 'wght' 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sm-ink-dim);
+  margin: 0 0 18px;
+  font-weight: 400;
+}
+section { margin-bottom: 52px; }
+.row { display: flex; align-items: flex-start; gap: 28px; flex-wrap: wrap; }
+.swatch {
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-hairline);
+  border-radius: 12px;
+  padding: 26px 30px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  min-height: 132px;
+}
+.swatch.light { background: #F2F4F8; border-color: rgba(0,0,0,0.08); }
+.cap { font-size: 12px; letter-spacing: 0.08em; color: var(--sm-ink-dim); margin-top: 10px; display: block; }
+.stack { display: flex; flex-direction: column; align-items: flex-start; }
+
+.sm-logo { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+.sm-logo__mark { width: 44px; height: 44px; display: block; flex: none; }
+.sm-logo__type { display: flex; flex-direction: column; gap: 3px; }
+.sm-logo__name {
+  font-variation-settings: 'wdth' 112, 'wght' 700;
+  font-size: 26px; line-height: 1; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--sm-ink);
+}
+.sm-logo__tag {
+  font-variation-settings: 'wdth' 112, 'wght' 500;
+  font-size: 12px; line-height: 1; letter-spacing: 0.14em; color: var(--sm-cyan);
+}
+.sm-logo--compact .sm-logo__type { display: none; }
+.sm-logo--compact .sm-logo__mark { width: 36px; height: 36px; }
+
+.kiosk {
+  background: var(--sm-page);
+  border: 1px solid var(--sm-hairline);
+  border-radius: 12px;
+  padding: 40px 56px 44px;
+}
+.kiosk-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.sm-clock { text-align: right; line-height: 1; }
+.sm-clock__time { font-size: 28px; font-variation-settings: 'wdth' 100, 'wght' 400; opacity: 0.72; }
+.sm-clock__date { font-size: 15px; opacity: 0.45; margin-top: 7px; }
+.tiles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; margin-top: 36px; }
+.tile { aspect-ratio: 16 / 9; background: var(--sm-surface); border: 1px solid var(--sm-hairline); border-radius: 12px; }
+
+.palette { display: flex; gap: 14px; flex-wrap: wrap; }
+.chip { border-radius: 12px; padding: 14px 16px; width: 168px; border: 1px solid var(--sm-hairline); }
+.chip b { display: block; font-variation-settings: 'wdth' 100, 'wght' 600; font-weight: 400; font-size: 13px; }
+.chip span { font-size: 12px; opacity: 0.7; font-feature-settings: 'tnum'; }
+.old img { display: block; border-radius: 6px; }
+@media (max-width: 720px) {
+  body { padding: 24px; }
+  .kiosk { padding: 24px; }
+  .tiles { grid-template-columns: repeat(3, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="sm-color" viewBox="0 0 64 64">
+    <g fill="none" stroke="#23C9F2" stroke-width="4.5" stroke-linecap="round">
+      <path d="M16 6 38 28"/><path d="M48 6 26 28"/>
+    </g>
+    <path fill="#23C9F2" fill-rule="evenodd" d="M14 22h36a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H14a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8Zm12 8v18l17-9-17-9Z"/>
+    <rect x="23" y="56" width="18" height="4.5" rx="2.25" fill="#23C9F2"/>
+  </symbol>
+  <symbol id="sm-duotone" viewBox="0 0 64 64">
+    <g fill="none" stroke="#23C9F2" stroke-width="4.5" stroke-linecap="round">
+      <path d="M16 6 38 28"/><path d="M48 6 26 28"/><path d="M24 58.25h16"/>
+    </g>
+    <rect x="8.25" y="24.25" width="47.5" height="29.5" rx="7.75" fill="none" stroke="#23C9F2" stroke-width="4.5"/>
+    <path fill="#E736C8" d="M27 30.5 43 39l-16 8.5z"/>
+  </symbol>
+  <symbol id="sm-mono" viewBox="0 0 64 64">
+    <g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
+      <path d="M16 6 38 28"/><path d="M48 6 26 28"/>
+    </g>
+    <path fill="currentColor" fill-rule="evenodd" d="M14 22h36a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H14a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8Zm12 8v18l17-9-17-9Z"/>
+    <rect x="23" y="56" width="18" height="4.5" rx="2.25" fill="currentColor"/>
+  </symbol>
+  <symbol id="sm-favicon" viewBox="0 0 32 32">
+    <path fill="#23C9F2" fill-rule="evenodd" d="M7 6h18a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V11a5 5 0 0 1 5-5Zm6 5v10l9-5-9-5Z"/>
+  </symbol>
+</svg>
+
+<section>
+  <h2>Primary mark</h2>
+  <div class="stack">
+    <div class="swatch">
+      <svg width="120" height="120"><use href="#sm-color"/></svg>
+      <svg width="64" height="64"><use href="#sm-color"/></svg>
+      <svg width="44" height="44"><use href="#sm-color"/></svg>
+      <svg width="28" height="28"><use href="#sm-color"/></svg>
+    </div>
+    <span class="cap">120 / 64 / 44 / 28 px</span>
+  </div>
+</section>
+
+<section>
+  <h2>Variants</h2>
+  <div class="row">
+    <div class="stack">
+      <div class="swatch"><svg width="84" height="84"><use href="#sm-duotone"/></svg></div>
+      <span class="cap">Duotone, monoline</span>
+    </div>
+    <div class="stack">
+      <div class="swatch" style="color:var(--sm-ink)"><svg width="84" height="84"><use href="#sm-mono"/></svg></div>
+      <span class="cap">Mono on dark</span>
+    </div>
+    <div class="stack">
+      <div class="swatch light" style="color:#0C0F15"><svg width="84" height="84"><use href="#sm-mono"/></svg></div>
+      <span class="cap">Mono on light</span>
+    </div>
+    <div class="stack">
+      <div class="swatch">
+        <svg width="64" height="64"><use href="#sm-favicon"/></svg>
+        <svg width="32" height="32"><use href="#sm-favicon"/></svg>
+        <svg width="16" height="16"><use href="#sm-favicon"/></svg>
+      </div>
+      <span class="cap">Favicon &middot; 64 / 32 / 16 px</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Lockup</h2>
+  <div class="row">
+    <div class="stack">
+      <div class="swatch" style="padding:32px 40px">
+        <span class="sm-logo">
+          <svg class="sm-logo__mark"><use href="#sm-color"/></svg>
+          <span class="sm-logo__type">
+            <span class="sm-logo__name">Strange Media</span>
+            <span class="sm-logo__tag">Your entertainment hub</span>
+          </span>
+        </span>
+      </div>
+      <span class="cap">Full lockup</span>
+    </div>
+    <div class="stack">
+      <div class="swatch light" style="padding:32px 40px">
+        <span class="sm-logo">
+          <svg class="sm-logo__mark"><use href="#sm-color"/></svg>
+          <span class="sm-logo__type">
+            <span class="sm-logo__name" style="color:#0C0F15">Strange Media</span>
+            <span class="sm-logo__tag" style="color:#0E93B8">Your entertainment hub</span>
+          </span>
+        </span>
+      </div>
+      <span class="cap">Full lockup on light</span>
+    </div>
+    <div class="stack">
+      <div class="swatch" style="padding:32px 40px">
+        <span class="sm-logo sm-logo--compact">
+          <svg class="sm-logo__mark"><use href="#sm-color"/></svg>
+          <span class="sm-logo__type"><span class="sm-logo__name">Strange Media</span></span>
+        </span>
+      </div>
+      <span class="cap">Compact</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Launcher header in context</h2>
+  <div class="kiosk">
+    <div class="kiosk-header">
+      <span class="sm-logo">
+        <svg class="sm-logo__mark"><use href="#sm-color"/></svg>
+        <span class="sm-logo__type">
+          <span class="sm-logo__name">Strange Media</span>
+          <span class="sm-logo__tag">Your entertainment hub</span>
+        </span>
+      </span>
+      <div class="sm-clock">
+        <div class="sm-clock__time">11:31 PM</div>
+        <div class="sm-clock__date">Wednesday, September 9</div>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+      <div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Palette</h2>
+  <div class="palette">
+    <div class="chip" style="background:#23C9F2;color:#06323E"><b>Cyan</b><span>#23C9F2</span></div>
+    <div class="chip" style="background:#E736C8;color:#3B0733"><b>Magenta</b><span>#E736C8</span></div>
+    <div class="chip" style="background:#F2F4F8;color:#0C0F15"><b>Ink</b><span>#F2F4F8</span></div>
+    <div class="chip" style="background:#161A22"><b>Surface</b><span>#161A22</span></div>
+    <div class="chip" style="background:#0C0F15"><b>Page</b><span>#0C0F15</span></div>
+  </div>
+</section>
+
+<section class="old">
+  <h2>For comparison &mdash; current artwork</h2>
+  <div class="row">
+    <div class="stack">
+      <div class="swatch light"><img src="data:image/jpeg;base64,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" width="100" height="84" alt="Current icon"></div>
+      <span class="cap">Logo-Small.png</span>
+    </div>
+    <div class="stack">
+      <div class="swatch light"><img src="data:image/jpeg;base64,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" width="168" height="84" alt="Current lockup"></div>
+      <span class="cap">Logo-Full.png</span>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

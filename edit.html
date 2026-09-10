@@ -3,17 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Launcher settings</title>
+<title>Strange Media settings</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath fill='%2323C9F2' fill-rule='evenodd' d='M7 6h18a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V11a5 5 0 0 1 5-5Zm6 5v10l9-5-9-5Z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400;62..125,500;62..125,700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink:        #1A1F2B;
-    --ink-raised: #141824;
-    --chalk:      #EDEFF4;
-    --haze:       #79839B;
-    --live:       #4C8DFF;
+    /* Strange Media tokens, copied from design/brand.css alongside the same
+       set in index.html. The two pages have to agree, since one previews the
+       other. */
+    --ink:        #0C0F15;
+    --ink-raised: #161A22;
+    --chalk:      #F2F4F8;
+    --haze:       rgba(242, 244, 248, 0.45);
+    --live:       #23C9F2;
+    --magenta:    #E736C8;
     --warn:       #E8402F;
     --safe-x: 4.5vw;
     --safe-y: 4vh;
@@ -82,7 +87,7 @@
   [data-nav]:focus {
     outline: none;
     border-color: var(--live);
-    box-shadow: 0 0 0 4px rgba(76, 141, 255, 0.22);
+    box-shadow: 0 0 0 4px rgba(35, 201, 242, 0.24);
   }
   /* A blue ring around a blue button is no ring at all. Anything already
      wearing the accent color gets its focus drawn in the text color, which
@@ -134,7 +139,7 @@
   .row.add .who b { color: var(--live); }
 
   .actions { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1em; }
-  .primary { background: var(--live); color: #06122B; font-variation-settings: "wght" 500; }
+  .primary { background: var(--live); color: #06323E; font-variation-settings: "wght" 500; }
   .danger  { background: transparent; border-color: var(--warn); color: var(--warn); }
 
   .field { margin-bottom: 0.9em; }
@@ -181,7 +186,7 @@
   #palette-set { width: 12em; margin-bottom: 0.7em; }
   .toggle[aria-pressed="true"] {
     background: var(--live);
-    color: #06122B;
+    color: #06323E;
     font-variation-settings: "wght" 500;
   }
   /* Board on the left, preview filling the space beside it. Halving the
@@ -293,7 +298,7 @@
   <!-- ---------- list view ---------- -->
   <section id="list-view">
     <button class="row add" id="add" type="button" data-nav>
-      <span class="swatch" style="background:#06122B;color:#4C8DFF">+</span>
+      <span class="swatch" style="background:#06323E;color:#23C9F2">+</span>
       <span class="who"><b>Add a service</b><small>A web page, or an app already installed in Android</small></span>
     </button>
 
@@ -371,7 +376,7 @@
     </div>
 
     <button class="row" id="hidden-toggle" type="button" data-nav>
-      <span class="swatch" id="hidden-mark" style="background:#06122B;color:#79839B">&#10003;</span>
+      <span class="swatch" id="hidden-mark" style="background:#06323E;color:#79839B">&#10003;</span>
       <span class="who"><b id="hidden-label">Shown on the launcher</b><small>Hidden tiles stay in the catalog and keep their settings</small></span>
     </button>
 
@@ -425,7 +430,7 @@
     bright: [
       "#E50914", "#FF5722", "#FF9800", "#FFC107",
       "#1CE783", "#01875F", "#00BCD4", "#00A8E1",
-      "#0064FF", "#113CCF", "#4C8DFF", "#7C4DFF",
+      "#0064FF", "#113CCF", "#23C9F2", "#7C4DFF",
       "#C724B1", "#E91E63", "#EDEFF4", "#79839B",
     ],
     dark: [
@@ -591,7 +596,7 @@
       row.className = "row";
       row.setAttribute("data-nav", "");
       row.innerHTML =
-        '<span class="swatch" style="background:#06122B;color:#4C8DFF">+</span>' +
+        '<span class="swatch" style="background:#06323E;color:#23C9F2">+</span>' +
         '<span class="who"><b></b><small></small></span>';
       row.querySelector("b").textContent = app.name;
       row.querySelector("small").textContent = app.package;

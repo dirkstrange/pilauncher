@@ -1,0 +1,62 @@
+/* Strange Media brand tokens and header lockup.
+   Font: Archivo variable (Google Fonts). Self-host the woff2 for kiosk boot;
+   the @import below is fine for development but needs the network. */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@112,500;112,600;112,700&display=swap');
+
+:root {
+  --sm-cyan:     #23C9F2;
+  --sm-magenta:  #E736C8;
+  --sm-ink:      #F2F4F8;
+  --sm-ink-dim:  rgba(242, 244, 248, 0.45);
+  --sm-page:     #0C0F15;
+  --sm-surface:  #161A22;
+  --sm-hairline: rgba(255, 255, 255, 0.07);
+
+  --sm-font: 'Archivo', 'Archivo Expanded', system-ui, sans-serif;
+}
+
+/* ---- Header lockup ---- */
+
+.sm-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-decoration: none;
+}
+
+.sm-logo__mark {
+  width: 44px;
+  height: 44px;
+  display: block;
+  flex: none;
+}
+
+.sm-logo__type {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sm-logo__name {
+  font-family: var(--sm-font);
+  font-variation-settings: 'wdth' 112, 'wght' 700;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sm-ink);
+}
+
+.sm-logo__tag {
+  font-family: var(--sm-font);
+  font-variation-settings: 'wdth' 112, 'wght' 500;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  color: var(--sm-cyan);
+}
+
+/* Mark-only variant for tight headers */
+.sm-logo--compact .sm-logo__type { display: none; }
+.sm-logo--compact .sm-logo__mark { width: 36px; height: 36px; }

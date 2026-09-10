@@ -9,13 +9,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400;62..125,500;62..125,700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --ink:        #1A1F2B;
-    --ink-raised: #141824;
-    --chalk:      #EDEFF4;
+    /* Strange Media tokens, copied from design/brand.css. That folder is the
+       source of truth for the mark and the palette, so a change there wants
+       making here too. The page is darker than it was, which also buys the
+       focus ring the contrast it wants. */
+    --ink:        #0C0F15;
+    --ink-raised: #161A22;
+    --chalk:      #F2F4F8;
+    --haze:       rgba(242, 244, 248, 0.45);
+    --cyan:       #23C9F2;
+    --magenta:    #E736C8;
     /* The ring around a tile being moved, so picking one up reads as a
        different state rather than a slightly bigger focus. */
-    --live-ring:  #4C8DFF;
-    --haze:       #79839B;
+    --live-ring:  var(--magenta);
     --safe-x: 4.5vw;
     --safe-y: 4vh;
     --gap: 1.2vw;
@@ -71,10 +77,34 @@
        backdrop just sits there and then takes the mark out with it. */
     animation: splash-veil 5s ease forwards;
   }
-  #splash img {
-    width: min(52vw, 62vh);
-    height: auto;
+  /* The duotone mark rather than the flat one, which is the variant the brand
+     sheet reserves for exactly this: one place, at size, with room to be
+     itself. */
+  .splash-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5em;
     animation: splash-mark 5s ease forwards;
+  }
+  .splash-lockup .mark {
+    width: min(22vw, 30vh);
+    height: min(22vw, 30vh);
+  }
+  .splash-lockup .name {
+    font-variation-settings: "wdth" 112, "wght" 700;
+    font-size: clamp(28px, 3.6vw, 68px);
+    line-height: 1;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--chalk);
+  }
+  .splash-lockup .tag {
+    font-variation-settings: "wdth" 112, "wght" 500;
+    font-size: clamp(11px, 1.05vw, 20px);
+    line-height: 1;
+    letter-spacing: 0.14em;
+    color: var(--cyan);
   }
   @keyframes splash-veil {
     0%, 72% { opacity: 1; }
@@ -93,9 +123,39 @@
     justify-content: space-between;
     gap: 1.5vw;
   }
+  /* The header lockup from design/brand.css, sized for a television rather
+     than a browser window. The mark takes its color from the element, so the
+     one path serves the header and anywhere else it is needed. */
   #brand {
-    height: clamp(30px, 2.7vw, 52px);
-    width: auto;
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 0.75vw, 14px);
+  }
+  #brand .mark {
+    width: clamp(26px, 2.3vw, 44px);
+    height: clamp(26px, 2.3vw, 44px);
+    flex: none;
+    color: var(--cyan);
+  }
+  #brand .wordmark {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #brand .name {
+    font-variation-settings: "wdth" 112, "wght" 700;
+    font-size: clamp(14px, 1.35vw, 26px);
+    line-height: 1;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--chalk);
+  }
+  #brand .tag {
+    font-variation-settings: "wdth" 112, "wght" 500;
+    font-size: clamp(8px, 0.63vw, 12px);
+    line-height: 1;
+    letter-spacing: 0.14em;
+    color: var(--cyan);
   }
   /* The gear sits inboard of the clock rather than in the corner itself, so
      the two read as one group against the right edge. */
@@ -150,11 +210,11 @@
     fill: currentColor;
   }
   #gear.focused {
-    background: #4C8DFF;
-    color: #06122B;
+    background: var(--cyan);
+    color: #06323E;
     transform: scale(1.12);
     box-shadow:
-      0 0 46px -8px #4C8DFF,
+      0 0 46px -8px var(--cyan),
       0 14px 30px -14px rgba(0, 0, 0, 0.9);
   }
 
@@ -418,10 +478,37 @@
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true"><img src="/logo-full.png" alt=""></div>
+<div id="splash" aria-hidden="true">
+  <div class="splash-lockup">
+    <svg class="mark" viewBox="0 0 64 64">
+      <g fill="none" stroke="#23C9F2" stroke-width="4.5" stroke-linecap="round">
+        <path d="M16 6 38 28"/>
+        <path d="M48 6 26 28"/>
+        <path d="M24 58.25h16"/>
+      </g>
+      <rect x="8.25" y="24.25" width="47.5" height="29.5" rx="7.75" fill="none" stroke="#23C9F2" stroke-width="4.5"/>
+      <path fill="#E736C8" d="M27 30.5 43 39l-16 8.5z"/>
+    </svg>
+    <div class="name">Strange Media</div>
+    <div class="tag">Your entertainment hub</div>
+  </div>
+</div>
 <div id="shell">
   <header>
-    <img id="brand" src="/logo-small.png" alt="Pi Media">
+    <div id="brand" role="img" aria-label="Strange Media, your entertainment hub">
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round">
+          <path d="M16 6 38 28"/>
+          <path d="M48 6 26 28"/>
+        </g>
+        <path fill="currentColor" fill-rule="evenodd" d="M14 22h36a8 8 0 0 1 8 8v18a8 8 0 0 1-8 8H14a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8Zm12 8v18l17-9-17-9Z"/>
+        <rect x="23" y="56" width="18" height="4.5" rx="2.25" fill="currentColor"/>
+      </svg>
+      <span class="wordmark">
+        <span class="name">Strange Media</span>
+        <span class="tag">Your entertainment hub</span>
+      </span>
+    </div>
     <div id="corner">
       <button id="gear" type="button" aria-label="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true">

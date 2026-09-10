@@ -32,6 +32,14 @@ shell/
 !logo-full.png
 !logo-small.png
 
+# design/ is the brand kit: the marks, the tokens and the sheet they are
+# documented on. The rule above exists to catch a service logo dropped in on
+# its way to the Pi, which is the opposite of this. The launcher inlines these
+# marks rather than fetching them, so the folder is reference rather than a
+# runtime dependency, and it is the source of truth for both.
+!design/
+!design/*
+
 
 # Predecessor LineageOS ROM, Magisk, gapps and widevine zips (~1GB). Kept for
 # reference, never part of the launcher.
