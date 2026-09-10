@@ -205,25 +205,17 @@
     flex-direction: column;
     gap: 0.4em;
   }
-  /* A copy of the tile as the launcher draws it: same 16/10, same corner, the
-     face on a pseudo-element so the unfocused version can be dimmed without
-     draining the logo with it. Kept in step with index.html by hand, which is
-     the cost of previewing one page inside another. */
-  .tile-previews {
-    display: flex;
-    gap: 0.9em;
-    align-items: flex-start;
-  }
-  .tile-previews figure { flex: 1 1 0; min-width: 0; }
-  .tile-previews figcaption {
-    color: var(--haze);
-    font-size: 0.85em;
-    text-align: center;
-    margin-top: 0.35em;
-  }
+  /* A copy of the tile as the launcher draws it: same shape, same corner,
+     same logo sizing. Kept in step with index.html by hand, which is the
+     cost of previewing one page inside another and has already caught this
+     preview out once. */
+  .tile-previews { max-width: 26em; }
   .tile-preview {
     position: relative;
-    aspect-ratio: 16 / 10;
+    /* Matches .tile in index.html, which went to 16/9 when the grid became
+       five across. This is the second thing on this preview to fall behind
+       that file; if a third appears, the shared numbers want extracting. */
+    aspect-ratio: 16 / 9;
     border-radius: 14px;
     /* Flex, not grid. The logo below is capped as a percentage of this box,
        and Chromium resolves that against a flex line but not a grid area. */
@@ -242,10 +234,6 @@
     border-radius: inherit;
     background: var(--face, #06122B);
   }
-  /* The same recede the launcher applies to a tile that is not selected. */
-  .tile-preview.dimmed::before { filter: saturate(0.92) brightness(0.9); }
-  .tile-preview.dimmed img,
-  .tile-preview.dimmed .pv-label { opacity: 0.9; }
   .tile-preview > * { position: relative; z-index: 1; }
   .tile-preview img {
     max-width: calc(78% * var(--logo-scale, 1));
@@ -374,14 +362,7 @@
             <input id="f-scale" type="range" min="0.4" max="1.4" step="0.05" value="1" data-nav>
           </div>
           <div class="tile-previews">
-            <figure>
-              <div class="tile-preview" id="preview-on"></div>
-              <figcaption>Focused</figcaption>
-            </figure>
-            <figure>
-              <div class="tile-preview dimmed" id="preview-off"></div>
-              <figcaption>Not focused</figcaption>
-            </figure>
+            <div class="tile-preview" id="preview-on"></div>
           </div>
           <p class="picker-hint" id="picker-hint" hidden></p>
         </div>
@@ -857,8 +838,7 @@
     const face = faceColor();
     const ink = inkColor();
     const hint = $("picker-hint");
-    ["preview-on", "preview-off"].forEach((id, at) => {
-      const box = $(id);
+    [$("preview-on")].forEach((box, at) => {
       box.textContent = "";
       box.style.setProperty("--face", face);
       box.style.setProperty("--logo-scale", String(logoScale));
@@ -905,7 +885,7 @@
     });
     hint.hidden = !logoUrl;
     if (logoUrl) {
-      hint.textContent = "Click either tile to take a color from the logo. "
+      hint.textContent = "Click the logo to take a color from it. "
         + "Colors found in it are under From logo.";
     }
     $("shadow-toggle").hidden = !logoUrl;

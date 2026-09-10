@@ -26,14 +26,10 @@
     --safe-y: 4vh;
     --gap: 1.2vw;
 
-    /* How far an unfocused tile recedes. 1 is no change at all; the effect
-       started at 0.5 brightness, which turned the light tiles grey. Kept as
-       variables so the strength is one place to adjust. */
-    --dim-brightness: 0.72;
-    --dim-saturate: 0.78;
-    --dim-opacity: 0.62;
-    /* Stronger while a tile is being moved, since that is a modal state and
-       wants to read differently from ordinary focus. */
+    /* How far the rest of the grid recedes while one tile is being moved.
+       Ordinary focus dims nothing at all: the ring says which tile is
+       selected, and an unfocused tile has no reason to be harder to read.
+       Rearranging is a modal state and does want to look different. */
     --arrange-brightness: 0.62;
     --arrange-saturate: 0.5;
     --arrange-opacity: 0.55;
@@ -287,24 +283,18 @@
        They were one value, which meant a red Netflix wordmark sat on a red
        tile and vanished the moment it lit up. */
     background: var(--surface, var(--tint));
-    filter: saturate(var(--dim-saturate)) brightness(var(--dim-brightness));
     transition: filter 140ms ease;
   }
   .tile > * {
     position: relative;
     z-index: 1;
   }
-  .tile.focused::before { filter: none; }
-
-  /* Content dims by fading rather than desaturating, so an unfocused logo is
-     still recognisably its own color. */
+  /* Fades only for the rearranging state below, which is the one place
+     anything on this grid is deliberately pushed back. */
   .tile .label,
   .tile .logo {
-    opacity: var(--dim-opacity);
     transition: opacity 140ms ease;
   }
-  .tile.focused .label,
-  .tile.focused .logo { opacity: 1; }
   .tile .label {
     font-size: clamp(15px, 1.7vw, 32px);
     font-variation-settings: "wdth" 108, "wght" 700;
