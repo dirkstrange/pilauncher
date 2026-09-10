@@ -62,8 +62,7 @@
     font-variation-settings: "wght" 500;
     color: var(--haze);
     margin: 2em 0 0.7em;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.01em;
   }
   p.hint {
     color: var(--haze);
@@ -110,8 +109,8 @@
     text-align: left;
   }
   .row .swatch {
-    width: 2.4em;
-    height: 2.4em;
+    width: 3em;
+    height: 3em;
     border-radius: 9px;
     display: grid;
     place-items: center;
@@ -184,6 +183,19 @@
      field takes. It picks which sixteen colors are showing, so it belongs to
      the board and not to the form. */
   #palette-set { width: 12em; margin-bottom: 0.7em; }
+  .color-board label { display: block; color: var(--haze); margin-bottom: 0.3em; }
+  /* The color in use, shown beside the heading so it is visible whichever
+     board is open rather than only the one it belongs to. */
+  .current-chip {
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    border-radius: 4px;
+    vertical-align: -0.15em;
+    margin-left: 0.35em;
+    outline: 1px solid rgba(242, 244, 248, 0.25);
+    outline-offset: -1px;
+  }
   .toggle[aria-pressed="true"] {
     background: var(--live);
     color: #06323E;
@@ -249,10 +261,6 @@
     line-height: 1.05;
     font-size: 1.5em;
     max-width: 92%;
-  }
-  .picker-hint {
-    color: var(--haze);
-    font-size: 0.85em;
   }
   .logo-size label {
     display: block;
@@ -345,15 +353,15 @@
     </div>
 
     <div class="field">
-      <label for="palette-set">Tile color</label>
-      <select id="palette-set" data-nav>
-        <option value="bright">Bright</option>
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-        <option value="logo">From logo</option>
-      </select>
       <div class="color-row">
         <div class="color-board">
+          <label for="palette-set">Tile color <span class="current-chip" id="current-chip"></span></label>
+          <select id="palette-set" data-nav>
+            <option value="bright">Bright</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="logo">From logo</option>
+          </select>
           <div class="swatches" id="palette"></div>
         </div>
         <div class="color-side">
@@ -364,7 +372,6 @@
           <div class="tile-previews">
             <div class="tile-preview" id="preview-on"></div>
           </div>
-          <p class="picker-hint" id="picker-hint" hidden></p>
         </div>
       </div>
     </div>
@@ -741,13 +748,21 @@
     paint();
   }
 
+  // The chip beside the heading. Set from more than one place, because
+  // picking a swatch updates the board in place rather than rebuilding it.
+  function markCurrent() {
+    $("current-chip").style.background = chosenColor || "transparent";
+  }
+
   function renderPalette() {
     const box = $("palette");
     box.textContent = "";
-    const colors = tab === "logo" ? logoColors.slice() : FACES[tab].slice();
-    // A color read off a logo will rarely be one of the sixteen, so it joins
-    // the board rather than being quietly rounded to the nearest.
-    if (chosenColor && !colors.includes(chosenColor)) colors.push(chosenColor);
+    const colors = tab === "logo" ? logoColors.slice(0, 8) : FACES[tab].slice();
+    const known = FACES.bright.concat(FACES.dark, FACES.light, logoColors);
+    if (chosenColor && !colors.includes(chosenColor) && !known.includes(chosenColor)) {
+      colors.push(chosenColor);
+    }
+    markCurrent();
     colors.forEach(value => {
       const swatch = document.createElement("button");
       swatch.type = "button";
@@ -762,6 +777,7 @@
         // and the d-pad does not drop back to the start of the board.
         [...box.children].forEach(el =>
           el.setAttribute("aria-pressed", String(el.getAttribute("aria-label") === value)));
+        markCurrent();
         paint();
       });
       box.appendChild(swatch);
@@ -837,7 +853,6 @@
   function paint() {
     const face = faceColor();
     const ink = inkColor();
-    const hint = $("picker-hint");
     [$("preview-on")].forEach((box, at) => {
       box.textContent = "";
       box.style.setProperty("--face", face);
@@ -883,11 +898,6 @@
       }
       box.appendChild(img);
     });
-    hint.hidden = !logoUrl;
-    if (logoUrl) {
-      hint.textContent = "Click the logo to take a color from it. "
-        + "Colors found in it are under From logo.";
-    }
     $("shadow-toggle").hidden = !logoUrl;
     $("logo-size").hidden = !logoUrl;
   }
