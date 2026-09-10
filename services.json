@@ -94,10 +94,10 @@
   {
     "id": "jellyfin",
     "name": "Jellyfin",
-    "url": "http://192.168.1.10:30013",
+    "url": "http://jellyfin.local:8096",
     "color": "#AA5CC3",
     "ink": "#FFFFFF",
-    "note": "Local Jellyfin server. No DRM, so no resolution cap.",
+    "note": "Point this at your own Jellyfin server. No DRM, so no resolution cap and the Pi decodes at full quality.",
     "tile_bg": "#101725"
   },
   {
