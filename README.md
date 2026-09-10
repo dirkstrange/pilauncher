@@ -18,7 +18,11 @@ holding the OK button.
 
 Android apps work as well, through Waydroid. Anything installed from the Play
 Store appears in settings ready to become a tile, which is how YouTube and
-Netflix run here as real Android TV apps instead of web players.
+YouTube Music run here as real Android TV apps with proper remote navigation.
+
+That route stops at anything with DRM. Waydroid ships no Widevine, so Netflix
+and the other subscription services run as web players in Chromium, which
+does have it.
 
 ## Why it exists
 
