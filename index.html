@@ -478,6 +478,10 @@
     if (seen) { splash.remove(); return; }
     const drop = () => splash.remove();
     splash.addEventListener("animationend", drop, { once: true });
+    // A timer as well as the event. This overlay covers the whole screen, so
+    // an animationend that never arrives would leave the launcher unusable
+    // with no way to tell from the couch what had gone wrong.
+    setTimeout(drop, 5600);
     // A way past it, because five seconds is a long time once you know what
     // the launcher looks like.
     ["keydown", "mousedown"].forEach(evt =>
