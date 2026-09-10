@@ -333,18 +333,33 @@ than it looks: the remote has no Ctrl or Alt key, so `A-Escape`, `A-F4` and
 `C-A-d` cannot be typed on it at all, and without this there is no way to reach
 the Pi desktop from the couch.
 
-The mic button sends `XF86VoiceCommand`. It is valid and unbound, since there is
-nothing here to point it at.
+The mic button ships sending `XF86VoiceCommand`, which is a perfectly bindable
+key, but it is remapped to Back in the same hwdb rule as OK. A second back
+button reads like padding until you turn mouse mode on, which is when the
+remote's own back arrow stops being a key at all. The next section explains why
+that matters more than it sounds.
 
-### Mouse mode changes what OK sends
+### Mouse mode changes what several buttons send
 
 The cursor button toggles the gyro pointer. That toggle is handled inside the
 remote and sends nothing to the Pi, so it never shows up in a capture. While it
-is on, OK stops sending a key and sends a left click instead, and the D-pad
-drives the pointer rather than the tile cursor. Tiles still open, by being
-clicked rather than selected, which is what made the OK button look
-intermittently broken rather than mode-dependent while it was unmapped. Leave
-mouse mode off.
+is on, the D-pad drives the pointer rather than the tile cursor, OK sends a left
+click instead of a key, and the back arrow sends a right click. Tiles still
+open, by being clicked rather than selected, which is what made the OK button
+look intermittently broken rather than mode-dependent while it was unmapped.
+
+Neither mode is the right one for everything. The launcher's own tiles are
+built for a D-pad and want mouse mode off. Netflix's main page is the opposite:
+resting the selection on a tile expands it into a panel of buttons, which then
+traps the selection with no keyboard way out other than Escape, so browsing it
+in practice needs the pointer. Moving the pointer collapses an expanded tile on
+its own, so Escape is only useful in the mode you would not be using anyway.
+
+That split is the reason the mic button carries Back. Mouse mode is where you
+end up for browsing, and mouse mode is exactly where the back arrow stops being
+a key, so without the remap there is no way back while the pointer is live.
+Playback and ordinary pages honour the back arrow normally once mouse mode is
+off.
 
 ### The power button really does power off
 

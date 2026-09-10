@@ -301,7 +301,8 @@ cat <<EOM
     desktop, or Ctrl+Alt+D again.
 
     On the remote: OK opens a tile, Home returns to the tiles, the back
-    arrow goes back a page, and Menu toggles the Pi desktop. Leave mouse
-    mode off; it turns OK into a mouse click and the arrows into cursor
-    movement.
+    arrow and the mic button both go back a page, and Menu toggles the Pi
+    desktop. Mouse mode turns the D-pad into a pointer, OK into a left
+    click and the back arrow into a right click, which is why the mic
+    button carries Back as well: it is the only one that works in both.
 EOM

@@ -15,7 +15,17 @@
 # The remote's other buttons emit codes that do have keysyms, so they are bound
 # in labwc or handled in index.html rather than rewritten here.
 #
+# The mic button is remapped to Back for a different reason. Turning the
+# remote's mouse mode on repurposes the D-pad as a pointer, OK as a left click
+# and the back arrow as a right click, so in that mode the remote has no back
+# key at all. Netflix's main page is close to unusable without a pointer: its
+# tiles expand when the selection rests on one and then trap it, so mouse mode
+# is the practical way to browse, and that is exactly where back went missing.
+# The mic button keeps sending a key in both modes and had nothing bound to it,
+# so it becomes the back button that works while browsing.
+#
 # The version field is deliberately left out of the match so a firmware
 # revision on the dongle does not silently drop the rule.
 evdev:input:b0003v4842p0001*
  KEYBOARD_KEY_c0041=enter
+ KEYBOARD_KEY_c00cf=back
