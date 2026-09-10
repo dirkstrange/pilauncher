@@ -67,7 +67,7 @@ if [ -d "$SEED" ] && [ -n "$(ls -A "$SEED" 2>/dev/null)" ]; then
 else
   warn "no Widevine seed at $SEED"
   warn "  a new service will fail DRM once, then work when reopened"
-  warn "  see the Widevine section in README.md to populate it"
+  warn "  see the Widevine section in docs/TECHNICAL.md to populate it"
 fi
 
 # ------------------------------------------------------------- systemd units

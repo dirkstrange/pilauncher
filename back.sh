@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Close whatever service window is open and fall back to the launcher.
-# Bind this to a compositor hotkey (see README) so it works from inside a
-# kiosk window, where page-level key handlers never fire.
+# Bind this to a compositor hotkey (see docs/TECHNICAL.md) so it works from
+# inside a kiosk window, where page-level key handlers never fire.
 set -euo pipefail
 PORT="${PILAUNCHER_PORT:-8800}"
 curl -fsS -X POST -H 'Content-Type: application/json' -d '{}' \

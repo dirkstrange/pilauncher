@@ -40,6 +40,12 @@ shell/
 !design/
 !design/*
 
+# screenshots/ is the shipped documentation for the README. Same reasoning as
+# design/: these are pictures of this project, not somebody's brand asset
+# waiting to be copied to the Pi.
+!screenshots/
+!screenshots/*
+
 
 # Predecessor LineageOS ROM, Magisk, gapps and widevine zips (~1GB). Kept for
 # reference, never part of the launcher.

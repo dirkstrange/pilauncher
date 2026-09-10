@@ -6,7 +6,7 @@
 # working there, so the same key starts it again. The daemon is left running
 # either way, since it holds no display state and costs nothing idle.
 #
-# Bind this to a compositor hotkey (see README).
+# Bind this to a compositor hotkey (see docs/TECHNICAL.md).
 set -euo pipefail
 
 UNIT=pilauncher-shell.service
