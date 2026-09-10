@@ -122,7 +122,37 @@
   .field { margin-bottom: 0.9em; }
   .field label { display: block; color: var(--haze); margin-bottom: 0.3em; }
   .field input, .field select { width: 100%; }
-  .colours { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6em; }
+
+  /* Four across because that is what fits a 4x4 board of colours without the
+     swatches turning into targets you have to aim at from the sofa. */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.6em;
+    max-width: 24em;
+  }
+  .swatches button {
+    aspect-ratio: 1;
+    border-radius: 12px;
+    padding: 0;
+    position: relative;
+  }
+  /* A dot rather than a ring, because the ring slot is taken by the focus
+     treatment and the two would fight on the swatch that is both. */
+  .swatches button[aria-pressed="true"]::after {
+    content: "";
+    position: absolute;
+    inset: 30%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
+  }
+  .faces { display: flex; gap: 0.5em; flex-wrap: wrap; }
+  .faces button[aria-pressed="true"] {
+    background: var(--live);
+    color: #06122B;
+    font-variation-settings: "wght" 500;
+  }
   .colour-preview {
     height: 4.2em;
     border-radius: 12px;
@@ -198,11 +228,16 @@
     </div>
 
     <div class="field">
-      <label>Colours</label>
-      <div class="colours">
-        <input id="f-color" data-nav placeholder="#RRGGBB tile" aria-label="Tile colour">
-        <input id="f-ink" data-nav placeholder="#RRGGBB text" aria-label="Text colour">
-        <input id="f-tile_bg" data-nav placeholder="#RRGGBB back" aria-label="Background colour">
+      <label>Colour</label>
+      <div class="swatches" id="palette"></div>
+    </div>
+
+    <div class="field">
+      <label>Tile face</label>
+      <div class="faces" id="faces">
+        <button type="button" data-nav data-face="dark">Dark</button>
+        <button type="button" data-nav data-face="light">Light</button>
+        <button type="button" data-nav data-face="brand">The colour</button>
       </div>
     </div>
 
@@ -245,6 +280,19 @@
   let editing = null;      // the service being edited, or null when adding
   let logoUrl = null;      // logo for the service in the form, if it has one
   let isHidden = false;
+  let chosenColor = "";    // the brand colour, the one colour actually picked
+  let face = "dark";       // what the tile face is made of: dark, light, brand
+
+  // A board of sixteen instead of a hex box. Chosen to cover the streaming
+  // brands already in the catalog and leave room either side, with two
+  // neutrals at the end for marks that carry their own colour.
+  const PALETTE = [
+    "#E50914", "#FF5722", "#FF9800", "#FFC107",
+    "#1CE783", "#01875F", "#00BCD4", "#00A8E1",
+    "#0064FF", "#113CCF", "#4C8DFF", "#7C4DFF",
+    "#C724B1", "#E91E63", "#EDEFF4", "#79839B",
+  ];
+  const PALETTE_COLUMNS = 4;
 
   function say(text, bad) {
     note.textContent = text || "";
@@ -272,7 +320,44 @@
       .filter(el => el.offsetParent !== null && !el.disabled);
   }
 
+  function moveInPalette(key) {
+    const swatches = [...document.querySelectorAll("[data-grid=palette]")];
+    const at = swatches.indexOf(document.activeElement);
+    if (at < 0) return false;
+    let to = -1;
+    if (key === "ArrowLeft") to = at - 1;
+    else if (key === "ArrowRight") to = at + 1;
+    else if (key === "ArrowUp") to = at - PALETTE_COLUMNS;
+    else if (key === "ArrowDown") to = at + PALETTE_COLUMNS;
+    else return false;
+    if (to >= 0 && to < swatches.length) {
+      swatches[to].focus();
+      return true;
+    }
+    // Off the top or bottom of the board. The board is one step in a form, so
+    // this carries on to the field either side rather than stopping dead.
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      const items = focusables();
+      const edge = key === "ArrowUp"
+        ? items[items.indexOf(swatches[0]) - 1]
+        : items[items.indexOf(swatches[swatches.length - 1]) + 1];
+      if (edge) {
+        edge.focus();
+        edge.scrollIntoView({ block: "nearest" });
+        return true;
+      }
+    }
+    return false;
+  }
+
   document.addEventListener("keydown", e => {
+    const active = document.activeElement;
+    // The colour board is a grid, so it gets grid movement: sideways along a
+    // row, up and down between rows. The flat list below would walk it one
+    // swatch at a time, which is sixteen presses to cross four rows.
+    if (active && active.dataset && active.dataset.grid === "palette") {
+      if (moveInPalette(e.key)) { e.preventDefault(); return; }
+    }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const items = focusables();
       if (!items.length) return;
@@ -376,6 +461,74 @@
       .replace(/^-+/, "").replace(/-+$/, "").slice(0, 32);
   }
 
+  function luminance(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return (0.2126 * ((n >> 16) & 255)
+          + 0.7152 * ((n >> 8) & 255)
+          + 0.0722 * (n & 255)) / 255;
+  }
+
+  function shade(hex, divisor) {
+    const n = parseInt(hex.slice(1), 16);
+    return "#" + [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+      .map(v => Math.round(v / divisor).toString(16).padStart(2, "0"))
+      .join("").toUpperCase();
+  }
+
+  // The face and the label colour both follow from the colour and the face
+  // choice, so neither is asked for. Readable text on a tile is arithmetic
+  // rather than a decision worth handing to whoever is adding a service.
+  function faceColour() {
+    if (!chosenColor) return "#06122B";
+    if (face === "light") return "#FFFFFF";
+    if (face === "brand") return chosenColor;
+    return shade(chosenColor, 8);
+  }
+
+  function inkColour() {
+    return luminance(faceColour()) > 0.6 ? "#101014" : "#FFFFFF";
+  }
+
+  function inferFace(seed) {
+    const bg = (seed.tile_bg || "").toUpperCase();
+    // No face colour at all means the tile is painted in the brand colour,
+    // which is what the grid falls back to when tile_bg is missing.
+    if (!bg || bg === (seed.color || "").toUpperCase()) return "brand";
+    return luminance(bg) > 0.6 ? "light" : "dark";
+  }
+
+  function renderPalette() {
+    const box = $("palette");
+    box.textContent = "";
+    const colours = PALETTE.slice();
+    // A colour read off a logo will rarely be one of the sixteen, so it joins
+    // the board rather than being quietly rounded to the nearest.
+    if (chosenColor && !colours.includes(chosenColor)) colours.push(chosenColor);
+    colours.forEach(hex => {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.dataset.grid = "palette";
+      swatch.setAttribute("data-nav", "");
+      swatch.setAttribute("aria-label", hex);
+      swatch.setAttribute("aria-pressed", String(hex === chosenColor));
+      swatch.style.background = hex;
+      swatch.addEventListener("click", () => {
+        chosenColor = hex;
+        // Marked in place rather than re-rendered, so the swatch keeps focus
+        // and the d-pad does not drop back to the start of the board.
+        [...box.children].forEach(el =>
+          el.setAttribute("aria-pressed", String(el.getAttribute("aria-label") === hex)));
+        paint();
+      });
+      box.appendChild(swatch);
+    });
+  }
+
+  function renderFaces() {
+    [...$("faces").children].forEach(btn =>
+      btn.setAttribute("aria-pressed", String(btn.dataset.face === face)));
+  }
+
   function setHidden(value) {
     isHidden = value;
     $("hidden-label").textContent =
@@ -411,8 +564,8 @@
 
   function paint() {
     const box = $("preview");
-    box.style.background = $("f-tile_bg").value || "#06122B";
-    box.style.color = $("f-color").value || "#EDEFF4";
+    box.style.background = faceColour();
+    box.style.color = inkColour();
     box.textContent = "";
     if (logoUrl) {
       const img = document.createElement("img");
@@ -436,9 +589,12 @@
     $("f-kind").value = seed.kind === "android" ? "android" : "";
     $("f-url").value = seed.url || "";
     $("f-note").value = seed.note || "";
-    $("f-color").value = seed.color || "";
-    $("f-ink").value = seed.ink || "";
-    $("f-tile_bg").value = seed.tile_bg || "";
+    chosenColor = (seed.color || "").toUpperCase();
+    // A new tile starts dark, which is what most of the catalog uses and what
+    // a wall of tiles wants. An existing one keeps whatever it already has.
+    face = editing ? inferFace(seed) : "dark";
+    renderPalette();
+    renderFaces();
     logoUrl = seed.logo || null;
     $("remove").hidden = !editing;
     setHidden(Boolean(seed.hidden));
@@ -461,10 +617,13 @@
     } else {
       svc.url = $("f-url").value.trim();
     }
-    ["color", "ink", "tile_bg", "note"].forEach(field => {
-      const value = $("f-" + field).value.trim();
-      if (value) svc[field] = value;
-    });
+    const noteText = $("f-note").value.trim();
+    if (noteText) svc.note = noteText;
+    if (chosenColor) {
+      svc.color = chosenColor;
+      svc.tile_bg = faceColour();
+      svc.ink = inkColour();
+    }
     if (isHidden) svc.hidden = true;
     return svc;
   }
@@ -477,8 +636,13 @@
   $("cancel").addEventListener("click", showList);
   $("f-kind").addEventListener("change", onKind);
   $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
-  ["f-name", "f-color", "f-ink", "f-tile_bg"].forEach(id => {
-    $(id).addEventListener("input", paint);
+  $("f-name").addEventListener("input", paint);
+  [...$("faces").children].forEach(btn => {
+    btn.addEventListener("click", () => {
+      face = btn.dataset.face;
+      renderFaces();
+      paint();
+    });
   });
 
   $("save").addEventListener("click", async () => {
@@ -516,12 +680,11 @@
       const res = await api("/logo", { id: id, url: url });
       logoUrl = res.logo;
       const guess = res.suggested || {};
-      // Only fill blanks. A colour already chosen by hand beats a guess.
-      ["color", "ink", "tile_bg"].forEach(field => {
-        if (guess[field] && !$("f-" + field).value.trim()) {
-          $("f-" + field).value = guess[field];
-        }
-      });
+      // A colour already picked beats a guess, so this only fills an empty one.
+      if (guess.color && !chosenColor) {
+        chosenColor = guess.color.toUpperCase();
+        renderPalette();
+      }
       paint();
       say("Found one. Save to keep it.");
     } catch (err) {

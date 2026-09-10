@@ -397,10 +397,17 @@ machine.
 
 A web service needs a name and an address. "Fetch logo and colours" then reads
 the site for the largest icon it advertises, using the lookup in
-[scripts/fetch_logos.py](scripts/fetch_logos.py), and guesses the three tile
-colours from that image. Guesses only fill blanks, so a colour typed by hand
-survives one. Some sites publish nothing usable, Netflix among them, and those
-want an uploaded image instead.
+[scripts/fetch_logos.py](scripts/fetch_logos.py), and reads a brand colour off
+that image. A guess only fills a choice that is still empty, so a colour
+already picked survives one. Some sites publish nothing usable, Netflix among
+them, and those want an uploaded image instead.
+
+Colour is a board of sixteen rather than a hex field, on the grounds that
+nobody is typing `#E50914` with a d-pad. A colour read off a logo joins the
+board as a seventeenth swatch rather than being rounded to the nearest of the
+sixteen. The tile face is a separate choice of dark, light, or the colour
+itself, and the label colour is worked out from whichever of those is picked
+rather than asked for.
 
 Android tiles work differently, because there is no site to read a logo from
 and a package name one character out fails at launch with nothing on screen to
