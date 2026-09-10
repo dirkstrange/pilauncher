@@ -405,11 +405,21 @@ already picked survives one. Some sites publish nothing usable, Netflix among
 them, and those want an uploaded image instead.
 
 Color is a board of sixteen rather than a hex field, on the grounds that
-nobody is typing `#E50914` with a d-pad. A color read off a logo joins the
-board as a seventeenth swatch rather than being rounded to the nearest of the
-sixteen. The tile face is a separate choice of dark, light, or the color
-itself, and the label color is worked out from whichever of those is picked
-rather than asked for.
+nobody is typing `#E50914` with a d-pad. The swatch picked is the tile face
+itself, and a Dark and a Light tab decide which end of the range the board
+shows. An earlier version had you pick a bright brand color and then derived a
+near-black face from it, which meant the swatch you clicked was never the color
+you got.
+
+Three ways in when none of the sixteen is right: click the logo in the preview
+to take the exact pixel under the pointer, use any color found in the logo,
+which are added to the board so the d-pad can reach them, or press "Pick a
+color off the screen" where Chromium offers that.
+
+The label color follows from how light the face is, and the glow the launcher
+draws around a focused tile keeps whatever brand color the entry already had.
+A near-black face has no hue to turn up, so deriving that one would trade
+Netflix red for grey the first time a tile was saved.
 
 Android tiles work differently, because there is no site to read a logo from
 and a package name one character out fails at launch with nothing on screen to

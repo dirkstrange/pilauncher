@@ -349,7 +349,7 @@ HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 PACKAGE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]*([.][A-Za-z][A-Za-z0-9_]*)+$")
 CATALOG_FIELDS = frozenset({
     "id", "name", "url", "color", "ink", "tile_bg", "note",
-    "kind", "package", "user_agent", "extra_flags", "hidden",
+    "kind", "package", "user_agent", "extra_flags", "hidden", "logo_shadow",
 })
 
 
@@ -425,6 +425,10 @@ def validate_service(raw: dict) -> dict:
 
     if raw.get("hidden"):
         svc["hidden"] = True
+    # Recorded only when switched off. A shadow is the default, so writing an
+    # explicit true into every entry would be noise in the file.
+    if raw.get("logo_shadow") is False:
+        svc["logo_shadow"] = False
     return svc
 
 

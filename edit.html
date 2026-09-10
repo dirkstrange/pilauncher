@@ -250,9 +250,6 @@
 
   <!-- ---------- form view ---------- -->
   <section id="form-view" hidden>
-    <div class="color-preview" id="preview">Preview</div>
-    <p class="picker-hint" id="picker-hint" hidden></p>
-
     <div class="field">
       <label for="f-name">Name</label>
       <input id="f-name" data-nav autocomplete="off" spellcheck="false">
@@ -276,18 +273,21 @@
       <select id="f-package" data-nav></select>
     </div>
 
-    <div class="field">
-      <label>Color</label>
-      <div class="swatches" id="palette"></div>
-    </div>
+    <div class="color-preview" id="preview">Preview</div>
+    <p class="picker-hint" id="picker-hint" hidden></p>
+
+    <button class="row" id="shadow-toggle" type="button" data-nav hidden>
+      <span class="swatch" id="shadow-mark" style="background:#06122B;color:#79839B">&#10003;</span>
+      <span class="who"><b id="shadow-label">Drop shadow on the logo</b><small>Lifts a flat mark off the tile. Turn it off for a logo that carries its own edge or background</small></span>
+    </button>
 
     <div class="field">
-      <label>Tile face</label>
+      <label>Tile color</label>
       <div class="faces" id="faces">
         <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
         <button type="button" data-nav data-row="faces" data-face="light">Light</button>
-        <button type="button" data-nav data-row="faces" data-face="brand">The color</button>
       </div>
+      <div class="swatches" id="palette"></div>
     </div>
 
     <div class="field">
@@ -330,20 +330,31 @@
   let editing = null;      // the service being edited, or null when adding
   let logoUrl = null;      // logo for the service in the form, if it has one
   let isHidden = false;
-  let chosenColor = "";    // the brand color, the one color actually picked
-  let face = "dark";       // what the tile face is made of: dark, light, brand
+  let chosenColor = "";    // the tile color itself, exactly as it will appear
+  let tab = "dark";        // which board is showing: dark faces or light ones
+  let logoShadow = true;   // whether the tile lifts its logo with a shadow
+  let glow = "";           // the brand color the launcher glows when focused
   let logoColors = [];     // colors read out of the logo now in the preview
   let sampledFrom = null;  // the logo those came from, so it is read once
 
-  // A board of sixteen instead of a hex box. Chosen to cover the streaming
-  // brands already in the catalog and leave room either side, with two
-  // neutrals at the end for marks that carry their own color.
-  const PALETTE = [
-    "#E50914", "#FF5722", "#FF9800", "#FFC107",
-    "#1CE783", "#01875F", "#00BCD4", "#00A8E1",
-    "#0064FF", "#113CCF", "#4C8DFF", "#7C4DFF",
-    "#C724B1", "#E91E63", "#EDEFF4", "#79839B",
-  ];
+  // Two boards rather than one. An earlier version had you pick a bright
+  // brand color and then quietly derived a near-black face from it, so the
+  // swatch you clicked was never the color you got. Here the swatch is the
+  // face: the tabs only decide which end of the range is on offer.
+  const FACES = {
+    dark: [
+      "#121212", "#1A1F2B", "#0F171E", "#000000",
+      "#1C0A0A", "#2A1714", "#1E1207", "#0A1A0A",
+      "#07160F", "#071A1A", "#0A1633", "#12071E",
+      "#1A0714", "#242A38", "#2B2B2B", "#141824",
+    ],
+    light: [
+      "#FFFFFF", "#F5F7FA", "#EDEFF4", "#DDE3EC",
+      "#FDECEC", "#FFF1E6", "#FFF9E0", "#F7FAE6",
+      "#E9F7E9", "#E6F7F7", "#E8F1FF", "#F3EAFF",
+      "#FFEAF4", "#FAF0E1", "#F0F0F0", "#C9D2E0",
+    ],
+  };
   const PALETTE_COLUMNS = 4;
 
   function say(text, bad) {
@@ -380,7 +391,7 @@
   }
 
   // Anything laid out as a block of buttons rather than a stack of fields:
-  // the color board at four across, the tile face row at three. Movement
+  // the color board at four across, the pair of tabs above it. Movement
   // inside is by position, and running off the top or bottom hands over to
   // the field either side rather than stopping dead.
   function moveInGroup(key, selector, columns) {
@@ -404,19 +415,10 @@
   document.addEventListener("keydown", e => {
     const active = document.activeElement;
     const row = active && active.dataset ? active.dataset : {};
-    // The face row is three buttons wide and one tall, so a column count of
-    // three means left and right walk it while up and down always leave it.
+    // The tabs are a row two wide and one tall, so a column count of two
+    // means left and right walk them while up and down always leave.
     if (row.row === "faces") {
-      if (e.key === "ArrowUp") {
-        // Back to the board, landing on the color actually chosen rather
-        // than on whichever swatch happens to come last in it.
-        if (land(document.querySelector("[data-grid=palette][aria-pressed=true]")
-              || document.querySelector("[data-grid=palette]"))) {
-          e.preventDefault();
-          return;
-        }
-      }
-      if (moveInGroup(e.key, "[data-row=faces]", 3)) { e.preventDefault(); return; }
+      if (moveInGroup(e.key, "[data-row=faces]", 2)) { e.preventDefault(); return; }
     }
     // The color board is a grid, so it gets grid movement. The flat list
     // below would walk it one swatch at a time, which is sixteen presses to
@@ -537,33 +539,45 @@
           + 0.0722 * (n & 255)) / 255;
   }
 
-  function shade(hex, divisor) {
-    const n = parseInt(hex.slice(1), 16);
-    return "#" + [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-      .map(v => Math.round(v / divisor).toString(16).padStart(2, "0"))
-      .join("").toUpperCase();
-  }
-
-  // The face and the label color both follow from the color and the face
-  // choice, so neither is asked for. Readable text on a tile is arithmetic
-  // rather than a decision worth handing to whoever is adding a service.
+  // What the tile will actually look like. The swatch is the face, so there
+  // is nothing to derive here.
   function faceColor() {
-    if (!chosenColor) return "#06122B";
-    if (face === "light") return "#FFFFFF";
-    if (face === "brand") return chosenColor;
-    return shade(chosenColor, 8);
+    return chosenColor || "#06122B";
   }
 
+  // Readable text on the tile is arithmetic, not a decision worth handing to
+  // whoever is adding a service.
   function inkColor() {
     return luminance(faceColor()) > 0.6 ? "#101014" : "#FFFFFF";
   }
 
-  function inferFace(seed) {
-    const bg = (seed.tile_bg || "").toUpperCase();
-    // No face color at all means the tile is painted in the brand color,
-    // which is what the grid falls back to when tile_bg is missing.
-    if (!bg || bg === (seed.color || "").toUpperCase()) return "brand";
-    return luminance(bg) > 0.6 ? "light" : "dark";
+  function fromHsl(h, s, l) {
+    const channel = n => {
+      const k = (n + h * 12) % 12;
+      const a = s * Math.min(l, 1 - l);
+      return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+    };
+    return hex(channel(0), channel(8), channel(4));
+  }
+
+  // The launcher glows a tile in its brand color when focused, and a face
+  // that is nearly black would glow nearly not at all. The glow is that same
+  // hue turned up, rather than a second thing to pick.
+  function glowColor() {
+    const n = parseInt(faceColor().slice(1), 16);
+    const r = ((n >> 16) & 255) / 255;
+    const g = ((n >> 8) & 255) / 255;
+    const b = (n & 255) / 255;
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b);
+    if (hi === lo) return "#D8DEE9";   // a grey face has no hue to turn up
+    const d = hi - lo;
+    const l = (hi + lo) / 2;
+    const s = l > 0.5 ? d / (2 - hi - lo) : d / (hi + lo);
+    let h;
+    if (hi === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (hi === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+    return fromHsl(h, Math.max(s, 0.7), 0.55);
   }
 
   function hex(r, g, b) {
@@ -631,7 +645,7 @@
   function renderPalette() {
     const box = $("palette");
     box.textContent = "";
-    const colors = PALETTE.slice();
+    const colors = FACES[tab].slice();
     // Whatever came out of the logo goes on the board too, so it can be
     // reached with the d-pad rather than only by clicking the picture.
     logoColors.forEach(c => { if (!colors.includes(c)) colors.push(c); });
@@ -660,7 +674,14 @@
 
   function renderFaces() {
     [...$("faces").children].forEach(btn =>
-      btn.setAttribute("aria-pressed", String(btn.dataset.face === face)));
+      btn.setAttribute("aria-pressed", String(btn.dataset.face === tab)));
+  }
+
+  function setShadow(value) {
+    logoShadow = value;
+    $("shadow-label").textContent =
+      value ? "Drop shadow on the logo" : "No drop shadow on the logo";
+    $("shadow-mark").textContent = value ? "✓" : "✕";
   }
 
   function setHidden(value) {
@@ -718,15 +739,28 @@
         if (sampledFrom === logoUrl) return;
         sampledFrom = logoUrl;
         logoColors = sampleLogo(img);
+        // A new tile has no brand color yet, and the boldest color in the
+        // logo is a better guess at one than anything a near-black face can
+        // be turned into.
+        if (!glow) {
+          glow = logoColors.find(c => {
+            const n = parseInt(c.slice(1), 16);
+            const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+            return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
+          }) || "";
+        }
         renderPalette();
       });
       box.appendChild(img);
       hint.textContent = "Click the logo to take a color from it. "
-        + "Colors found in it are added to the board above.";
+        + "Colors found in it are added to the board below.";
       hint.hidden = false;
+      // Only worth offering while there is a logo for it to apply to.
+      $("shadow-toggle").hidden = false;
     } else {
       box.textContent = $("f-name").value || "Preview";
       hint.hidden = true;
+      $("shadow-toggle").hidden = true;
     }
   }
 
@@ -740,19 +774,21 @@
     $("f-kind").value = seed.kind === "android" ? "android" : "";
     $("f-url").value = seed.url || "";
     $("f-note").value = seed.note || "";
-    chosenColor = (seed.color || "").toUpperCase();
-    // A new tile starts dark, which is what most of the catalog uses and what
-    // a wall of tiles wants. An existing one keeps whatever it already has.
-    face = editing ? inferFace(seed) : "dark";
+    // A new tile starts on the dark board, which is what most of the
+    // catalog uses and what a wall of tiles wants.
+    chosenColor = (seed.tile_bg || seed.color || "").toUpperCase();
+    tab = chosenColor && luminance(chosenColor) > 0.6 ? "light" : "dark";
     logoUrl = seed.logo || null;
     // Cleared per tile, or the colors read out of the last logo stay on the
     // board while a different service is being edited.
     logoColors = [];
     sampledFrom = null;
+    glow = (seed.color || "").toUpperCase();
     renderPalette();
     renderFaces();
     $("remove").hidden = !editing;
     setHidden(Boolean(seed.hidden));
+    setShadow(seed.logo_shadow !== false);
     fillPackages(seed.package || "");
     onKind();
     paint();
@@ -777,9 +813,16 @@
     if (chosenColor) {
       svc.color = chosenColor;
       svc.tile_bg = faceColor();
+      // A face is usually near-black, which has no hue to turn up, so an
+      // existing brand color outranks anything derived from it. Without this
+      // a tile traded its glow for grey the first time it was saved.
+      svc.color = glow || glowColor();
       svc.ink = inkColor();
     }
     if (isHidden) svc.hidden = true;
+    // Written only when switched off, since a shadow is the default and an
+    // explicit true in every entry would be noise in the file.
+    if (!logoShadow) svc.logo_shadow = false;
     return svc;
   }
 
@@ -791,11 +834,15 @@
   $("cancel").addEventListener("click", showList);
   $("f-kind").addEventListener("change", onKind);
   $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
+  $("shadow-toggle").addEventListener("click", () => setShadow(!logoShadow));
   $("f-name").addEventListener("input", paint);
   [...$("faces").children].forEach(btn => {
     btn.addEventListener("click", () => {
-      face = btn.dataset.face;
+      tab = btn.dataset.face;
       renderFaces();
+      // The tab decides which colors are on the board, so the board has to be
+      // rebuilt. Without this the tabs highlighted and nothing else moved.
+      renderPalette();
       paint();
     });
   });

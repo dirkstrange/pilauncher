@@ -253,6 +253,10 @@
     filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
     pointer-events: none;
   }
+  /* Some marks arrive with their own edge or a solid background of their
+     own, and a second shadow under those reads as a printing mistake. Set
+     per service, since it depends entirely on the artwork. */
+  .tile .logo.flat { filter: none; }
   /* Kept in the DOM for screen readers and for the fallback path. */
   .tile.has-logo .label {
     position: absolute;
@@ -661,7 +665,7 @@
 
       if (svc.logo) {
         const img = document.createElement("img");
-        img.className = "logo";
+        img.className = svc.logo_shadow === false ? "logo flat" : "logo";
         img.alt = "";
         img.decoding = "async";
         // Only commit to the logo treatment once the image really loaded, so a
