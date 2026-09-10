@@ -39,6 +39,12 @@ So this is the other trade. The catalog is a JSON file you own. Nothing
 phones home, nothing recommends anything, and the only things on the screen
 are the services you put there.
 
+Owning it includes being able to take it with you. Settings will hand you the
+whole thing as a single file, tiles and colors and artwork and the order you
+arranged them in, and put it back on another Pi. Your logins do not travel,
+so a restored box asks you to sign in once per service, but everything you
+spent an evening arranging does.
+
 ## Screenshots
 
 Settings lists every tile, the Android apps that could become tiles, and the

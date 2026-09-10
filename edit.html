@@ -374,6 +374,19 @@
     <p class="hint" id="android-hint">Looking for installed apps...</p>
     <div id="android"></div>
 
+    <h2>Backup</h2>
+    <button class="row" id="export" type="button" data-nav>
+      <span class="swatch" style="background:#06323E;color:#23C9F2">&#8681;</span>
+      <span class="who"><b>Save a backup</b><small>One file holding every tile, its colors, its logo and the order they sit in</small></span>
+    </button>
+    <button class="row" id="restore" type="button" data-nav>
+      <span class="swatch" style="background:#2E0B29;color:#E736C8">&#8679;</span>
+      <span class="who"><b>Restore from a backup</b><small>Replaces everything below. The catalog it replaces is kept as services.json.bak</small></span>
+    </button>
+    <!-- Outside the tab order and without data-nav: the remote should land on
+         the button above, not on a file field it cannot usefully operate. -->
+    <input type="file" id="restore-file" accept="application/json,.json" hidden>
+
     <h2>This machine</h2>
     <button class="row" id="desktop" type="button" data-nav>
       <span class="swatch" style="background:#2A1714;color:#E8402F">&#9211;</span>
@@ -1149,6 +1162,57 @@
       say("Logo removed.");
     } catch (err) {
       say(err.message, true);
+    }
+  });
+
+  $("export").addEventListener("click", async () => {
+    say("Building a backup...");
+    try {
+      const res = await fetch("/export");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || ("HTTP " + res.status));
+      }
+      const blob = await res.blob();
+      // The daemon already names the file in a Content-Disposition header, for
+      // anyone fetching /export directly. Going through a blob instead keeps
+      // this page open rather than navigating the kiosk away from it, so the
+      // name has to be repeated here.
+      const name = "strange-media-backup-" +
+        new Date().toISOString().slice(0, 10) + ".json";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      say("Saved " + name + " (" + Math.round(blob.size / 1024) + " KB)");
+    } catch (err) {
+      say("Could not build a backup: " + err.message, true);
+    }
+  });
+
+  $("restore").addEventListener("click", () => $("restore-file").click());
+
+  $("restore-file").addEventListener("change", async (ev) => {
+    const file = ev.target.files && ev.target.files[0];
+    // Cleared straight away so picking the same file twice still fires change,
+    // which is what happens when the first attempt failed and was corrected.
+    ev.target.value = "";
+    if (!file) return;
+    say("Restoring from " + file.name + "...");
+    try {
+      const res = await api("/import", JSON.parse(await file.text()));
+      catalog = await api("/catalog");
+      renderList();
+      say("Restored " + res.services + " tiles, " + res.logos + " logos.");
+    } catch (err) {
+      // Covers a file that is not JSON, a backup this version cannot read, and
+      // a single bad entry inside one. The daemon validates the whole document
+      // before writing any of it, so a rejected restore has changed nothing.
+      say("Could not restore: " + err.message, true);
     }
   });
 

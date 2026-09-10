@@ -89,6 +89,15 @@ LOCAL_ONLY = frozenset({"/launch", "/close", "/desktop", "/display"})
 # Enough for a generous PNG, small enough that a mistyped upload cannot
 # fill the card.
 LOGO_MAX_BYTES = 2 * 1024 * 1024
+# A whole backup arrives in one request body, and with the logos base64'd a
+# real one runs to about a megabyte. This is the ceiling on any POST, so that
+# a body is never read until it fills memory. Generous enough for a catalog
+# several times the size of a plausible one.
+POST_MAX_BYTES = 32 * 1024 * 1024
+# Bumped only when the shape of a backup changes in a way an older daemon
+# could not read correctly. Refusing an unknown version is friendlier than
+# importing half of it.
+EXPORT_VERSION = 1
 SHELL_UNIT = os.environ.get("PILAUNCHER_SHELL_UNIT", "pilauncher-shell.service")
 # install.sh already puts wlopm in the labwc autostart, where it runs once to
 # turn the panel ON and stop the desktop blanking a film. This is the other
@@ -186,14 +195,20 @@ def load_catalog() -> list[dict]:
         return json.load(fh)
 
 
-def load_services() -> list[dict]:
-    """The catalog in display order, honouring a saved arrangement."""
-    services = load_catalog()
+def load_order() -> list[str]:
+    """The saved tile arrangement, or an empty list if there is not one."""
     try:
         ids = json.loads(ORDER_FILE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return services
-    if not isinstance(ids, list):
+        return []
+    return ids if isinstance(ids, list) else []
+
+
+def load_services() -> list[dict]:
+    """The catalog in display order, honouring a saved arrangement."""
+    services = load_catalog()
+    ids = load_order()
+    if not ids:
         return services
     rank = {sid: i for i, sid in enumerate(ids)}
     # sorted() is stable, so a service added to the catalog after the order was
@@ -523,6 +538,122 @@ def clear_logo(service_id: str) -> None:
         candidate = LOGO_DIR / (service_id + ext)
         if candidate.is_file():
             candidate.unlink()
+
+
+def build_export() -> dict:
+    """Everything needed to rebuild this launcher's catalog somewhere else.
+
+    One JSON document rather than an archive, because the whole project is
+    already JSON and a file you can open and read is worth more as a backup
+    than one that needs a tool. The logos are the only binary part and they
+    ride along base64'd, which costs a third in size and buys a backup that is
+    a single file. Twenty logos come to roughly a megabyte.
+
+    Only logos belonging to a service in the catalog are included. The logo
+    directory accumulates leftovers, and a backup is not the place to preserve
+    them.
+    """
+    services = load_catalog()
+    logos: dict[str, dict] = {}
+    for svc in services:
+        sid = svc.get("id")
+        found = logo_path(sid) if sid else None
+        if found is None:
+            continue
+        logos[sid] = {
+            "ext": found.suffix.lower(),
+            "data": base64.b64encode(found.read_bytes()).decode("ascii"),
+        }
+    return {
+        "pilauncher_export": EXPORT_VERSION,
+        "exported": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+        "services": services,
+        "order": load_order(),
+        "logos": logos,
+    }
+
+
+def apply_import(doc: dict) -> dict:
+    """Replace the catalog, tile order and logos from a backup document.
+
+    Everything is validated before anything is written. A backup with one bad
+    entry in the middle should be refused whole rather than applied as far as
+    the bad entry and abandoned there, which would leave a catalog that is
+    neither the old one nor the new one.
+
+    Raises ValueError with a message meant for whoever is restoring.
+    """
+    if not isinstance(doc, dict):
+        raise ValueError("that file is not a pilauncher backup")
+
+    version = doc.get("pilauncher_export")
+    if version != EXPORT_VERSION:
+        raise ValueError(
+            f"backup format {version!r} is not one this version reads "
+            f"(expected {EXPORT_VERSION})"
+        )
+
+    raw_services = doc.get("services")
+    if not isinstance(raw_services, list) or not raw_services:
+        raise ValueError("the backup contains no services")
+
+    services: list[dict] = []
+    seen: set[str] = set()
+    for index, entry in enumerate(raw_services, 1):
+        try:
+            svc = validate_service(entry)
+        except ValueError as exc:
+            raise ValueError(f"service {index} in the backup: {exc}") from exc
+        if svc["id"] in seen:
+            raise ValueError(f"the backup has two services called {svc['id']!r}")
+        seen.add(svc["id"])
+        services.append(svc)
+
+    # Decoded up front so a corrupt image cannot be discovered halfway through
+    # writing the set.
+    logos: list[tuple[str, str, bytes]] = []
+    raw_logos = doc.get("logos") or {}
+    if not isinstance(raw_logos, dict):
+        raise ValueError("logos must be an object keyed by service id")
+    for sid, item in raw_logos.items():
+        if sid not in seen:
+            # Not fatal. A logo for a service the backup does not carry is
+            # junk, and dropping it quietly is the right amount of fuss.
+            continue
+        if not isinstance(item, dict):
+            raise ValueError(f"logo for {sid!r} is not an object")
+        ext = str(item.get("ext") or "").lower()
+        if ext not in LOGO_TYPES:
+            raise ValueError(
+                f"logo for {sid!r} must be " + ", ".join(sorted(LOGO_TYPES))
+            )
+        try:
+            blob = base64.b64decode(str(item.get("data") or "").split(",", 1)[-1],
+                                    validate=True)
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"logo for {sid!r} is not valid base64") from exc
+        if not blob:
+            raise ValueError(f"logo for {sid!r} is empty")
+        if len(blob) > LOGO_MAX_BYTES:
+            raise ValueError(f"logo for {sid!r} is too large")
+        logos.append((sid, ext, blob))
+
+    raw_order = doc.get("order") or []
+    if not isinstance(raw_order, list):
+        raise ValueError("order must be a list of service ids")
+    # Filtered rather than rejected. An order naming a service the backup no
+    # longer carries is stale, not wrong, and load_services already copes.
+    order = [i for i in raw_order if isinstance(i, str) and i in seen]
+
+    save_catalog(services)
+    if order:
+        save_order(order)
+    LOGO_DIR.mkdir(parents=True, exist_ok=True)
+    for sid, ext, blob in logos:
+        clear_logo(sid)
+        (LOGO_DIR / (sid + ext)).write_bytes(blob)
+
+    return {"services": len(services), "logos": len(logos), "order": len(order)}
 
 
 def fetch_logo(svc: dict) -> None:
@@ -945,11 +1076,14 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # quieter journal output
         pass
 
-    def _send(self, status: int, body: bytes, ctype: str) -> None:
+    def _send(self, status: int, body: bytes, ctype: str,
+              extra: dict[str, str] | None = None) -> None:
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for key, value in (extra or {}).items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 
@@ -999,6 +1133,21 @@ class Handler(BaseHTTPRequestHandler):
             # page edits. /services.json stays the filtered view the tiles use.
             body = json.dumps(with_logos(load_catalog())).encode()
             self._send(200, body, "application/json")
+        elif path == "/export":
+            try:
+                body = json.dumps(build_export(), indent=2, ensure_ascii=False).encode()
+            except OSError as exc:
+                self._json(500, {"error": f"could not read the catalog: {exc}"})
+                return
+            # Named and marked as an attachment so hitting this straight from a
+            # browser or curl -OJ saves a file rather than filling a window
+            # with a megabyte of base64.
+            stamp = time.strftime("%Y-%m-%d")
+            self._send(
+                200, body, "application/json",
+                {"Content-Disposition":
+                 f'attachment; filename="strange-media-backup-{stamp}.json"'},
+            )
         elif path.startswith("/logos/"):
             name = path[len("/logos/"):]
             # Resolve and confirm the result is still inside LOGO_DIR, so a
@@ -1059,6 +1208,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         length = int(self.headers.get("Content-Length") or 0)
+        if length > POST_MAX_BYTES:
+            # Refused on the header rather than after reading, so an oversized
+            # body never reaches memory. The daemon can be bound to the house
+            # network, and an unbounded read there is an easy way to kill it.
+            self._json(413, {"error": "that request body is too large"})
+            return
         raw = self.rfile.read(length) if length else b"{}"
         try:
             payload = json.loads(raw or b"{}")
@@ -1100,6 +1255,19 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(500, {"error": str(exc)})
                 return
             self._json(200, {"launched": svc["id"], "pid": pid})
+        elif path == "/import":
+            # Not in LOCAL_ONLY, deliberately. Restoring a catalog is catalog
+            # editing, which this daemon has always allowed from a laptop on
+            # the house network; it drives nothing on the television.
+            try:
+                summary = apply_import(payload)
+            except ValueError as exc:
+                self._json(400, {"error": str(exc)})
+                return
+            except OSError as exc:
+                self._json(500, {"error": f"could not write the catalog: {exc}"})
+                return
+            self._json(200, summary)
         elif path == "/display":
             # The tile page asks for this. It is the only thing that knows how
             # long the screensaver has been up, and it is also the thing that

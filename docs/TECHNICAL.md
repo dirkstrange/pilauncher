@@ -508,6 +508,51 @@ the content rather than in the writing.
 The daemon rereads the catalog on every request, so a saved change shows up on
 the next paint without restarting anything.
 
+### Backing it up and restoring it
+
+Settings has "Save a backup" and "Restore from a backup". The backup is one
+JSON file holding the catalog, the tile order and every logo, the logos
+base64'd inline. Around 900KB for twenty tiles.
+
+One file rather than an archive because the whole project is already JSON and a
+backup you can open and read is worth more than one that needs a tool to
+inspect. Base64 costs a third in size and buys a single file that copies
+anywhere.
+
+```bash
+curl -OJ http://pi-mediacenter.local:8800/export
+```
+
+`GET /export` sets a `Content-Disposition` filename, so fetching it directly
+saves a named file. The settings page goes through a blob instead, only so the
+kiosk is not navigated away from the page you are standing in front of.
+
+`POST /import` replaces the catalog, the order and the logos. Neither endpoint
+is in `LOCAL_ONLY`: this is catalog editing, which has always been allowed from
+a laptop on the house network, and it drives nothing on the television.
+
+Everything is validated before anything is written. Each entry goes through the
+same `validate_service()` the settings page uses, ids must be unique, and every
+logo is base64-decoded and size-checked up front. A backup with one bad entry
+in the middle is refused whole rather than applied as far as the bad entry,
+which would leave a catalog that is neither the old one nor the new one. A
+refused restore has changed nothing, and an accepted one still leaves the
+previous catalog as `services.json.bak`.
+
+Two things are dropped quietly rather than treated as errors. Logos naming a
+service the backup does not carry, and order entries naming a service that no
+longer exists, which is what a tile deleted after the order was last saved
+looks like. Only logos belonging to a service in the catalog are exported, so
+the leftovers that accumulate in the logo directory stay out of the file.
+
+`pilauncher_export` is a format version. An unknown one is refused outright,
+because importing part of a document whose shape has changed is worse than
+importing none of it.
+
+Not included: browser profiles, and therefore not your logins. A restored box
+has your tiles, colors and artwork, and asks you to sign in to each service
+once.
+
 ## Leaving the launcher
 
 The launcher covers the desktop and restarts itself if you close its window, so
