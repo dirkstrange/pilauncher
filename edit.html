@@ -134,7 +134,7 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.6em;
-    max-width: 24em;
+    max-width: 12em;
   }
   .swatches button {
     aspect-ratio: 1;
@@ -240,9 +240,9 @@
     <div class="field">
       <label>Tile face</label>
       <div class="faces" id="faces">
-        <button type="button" data-nav data-face="dark">Dark</button>
-        <button type="button" data-nav data-face="light">Light</button>
-        <button type="button" data-nav data-face="brand">The colour</button>
+        <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
+        <button type="button" data-nav data-row="faces" data-face="light">Light</button>
+        <button type="button" data-nav data-row="faces" data-face="brand">The colour</button>
       </div>
     </div>
 
@@ -325,43 +325,60 @@
       .filter(el => el.offsetParent !== null && !el.disabled);
   }
 
-  function moveInPalette(key) {
-    const swatches = [...document.querySelectorAll("[data-grid=palette]")];
-    const at = swatches.indexOf(document.activeElement);
+  function land(el) {
+    if (!el) return false;
+    el.focus();
+    el.scrollIntoView({ block: "nearest" });
+    return true;
+  }
+
+  // Anything laid out as a block of buttons rather than a stack of fields:
+  // the colour board at four across, the tile face row at three. Movement
+  // inside is by position, and running off the top or bottom hands over to
+  // the field either side rather than stopping dead.
+  function moveInGroup(key, selector, columns) {
+    const group = [...document.querySelectorAll(selector)];
+    const at = group.indexOf(document.activeElement);
     if (at < 0) return false;
     let to = -1;
     if (key === "ArrowLeft") to = at - 1;
     else if (key === "ArrowRight") to = at + 1;
-    else if (key === "ArrowUp") to = at - PALETTE_COLUMNS;
-    else if (key === "ArrowDown") to = at + PALETTE_COLUMNS;
+    else if (key === "ArrowUp") to = at - columns;
+    else if (key === "ArrowDown") to = at + columns;
     else return false;
-    if (to >= 0 && to < swatches.length) {
-      swatches[to].focus();
-      return true;
-    }
-    // Off the top or bottom of the board. The board is one step in a form, so
-    // this carries on to the field either side rather than stopping dead.
-    if (key === "ArrowUp" || key === "ArrowDown") {
-      const items = focusables();
-      const edge = key === "ArrowUp"
-        ? items[items.indexOf(swatches[0]) - 1]
-        : items[items.indexOf(swatches[swatches.length - 1]) + 1];
-      if (edge) {
-        edge.focus();
-        edge.scrollIntoView({ block: "nearest" });
-        return true;
-      }
-    }
-    return false;
+    if (to >= 0 && to < group.length) return land(group[to]);
+    if (key !== "ArrowUp" && key !== "ArrowDown") return false;
+    const items = focusables();
+    return land(key === "ArrowUp"
+      ? items[items.indexOf(group[0]) - 1]
+      : items[items.indexOf(group[group.length - 1]) + 1]);
   }
 
   document.addEventListener("keydown", e => {
     const active = document.activeElement;
-    // The colour board is a grid, so it gets grid movement: sideways along a
-    // row, up and down between rows. The flat list below would walk it one
-    // swatch at a time, which is sixteen presses to cross four rows.
-    if (active && active.dataset && active.dataset.grid === "palette") {
-      if (moveInPalette(e.key)) { e.preventDefault(); return; }
+    const row = active && active.dataset ? active.dataset : {};
+    // The face row is three buttons wide and one tall, so a column count of
+    // three means left and right walk it while up and down always leave it.
+    if (row.row === "faces") {
+      if (e.key === "ArrowUp") {
+        // Back to the board, landing on the colour actually chosen rather
+        // than on whichever swatch happens to come last in it.
+        if (land(document.querySelector("[data-grid=palette][aria-pressed=true]")
+              || document.querySelector("[data-grid=palette]"))) {
+          e.preventDefault();
+          return;
+        }
+      }
+      if (moveInGroup(e.key, "[data-row=faces]", 3)) { e.preventDefault(); return; }
+    }
+    // The colour board is a grid, so it gets grid movement. The flat list
+    // below would walk it one swatch at a time, which is sixteen presses to
+    // cross four rows.
+    if (row.grid === "palette") {
+      if (moveInGroup(e.key, "[data-grid=palette]", PALETTE_COLUMNS)) {
+        e.preventDefault();
+        return;
+      }
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const items = focusables();
