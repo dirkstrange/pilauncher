@@ -175,8 +175,10 @@
     background: rgba(255, 255, 255, 0.94);
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
   }
-  .faces { display: flex; gap: 0.5em; flex-wrap: wrap; }
-  .faces button[aria-pressed="true"],
+  /* As wide as the board it names, rather than the full width every other
+     field takes. It picks which sixteen colors are showing, so it belongs to
+     the board and not to the form. */
+  #palette-set { width: 12em; margin-bottom: 0.7em; }
   .toggle[aria-pressed="true"] {
     background: var(--live);
     color: #06122B;
@@ -335,13 +337,13 @@
     </div>
 
     <div class="field">
-      <label>Tile color</label>
-      <div class="faces" id="faces">
-        <button type="button" data-nav data-row="faces" data-face="bright">Bright</button>
-        <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
-        <button type="button" data-nav data-row="faces" data-face="light">Light</button>
-        <button type="button" data-nav data-row="faces" data-face="logo" hidden>From logo</button>
-      </div>
+      <label for="palette-set">Tile color</label>
+      <select id="palette-set" data-nav>
+        <option value="bright">Bright</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+        <option value="logo">From logo</option>
+      </select>
       <div class="color-row">
         <div class="color-board">
           <div class="swatches" id="palette"></div>
@@ -503,11 +505,6 @@
   document.addEventListener("keydown", e => {
     const active = document.activeElement;
     const row = active && active.dataset ? active.dataset : {};
-    // The tabs are a row two wide and one tall, so a column count of two
-    // means left and right walk them while up and down always leave.
-    if (row.row === "faces") {
-      if (moveInGroup(e.key, "[data-row=faces]", 0)) { e.preventDefault(); return; }
-    }
     // The color board is a grid, so it gets grid movement. The flat list
     // below would walk it one swatch at a time, which is sixteen presses to
     // cross four rows.
@@ -766,14 +763,15 @@
   }
 
   function renderFaces() {
-    // The logo tab only exists while a logo has actually given up some
-    // colors, and selecting it and then removing the logo has to land
-    // somewhere, so it falls back to the dark board.
-    const fromLogo = $("faces").querySelector("[data-face=logo]");
+    // From logo is only an option while a logo has actually given up some
+    // colors. Picking it and then removing the logo has to land somewhere,
+    // so it falls back to the dark board.
+    const set = $("palette-set");
+    const fromLogo = set.querySelector("[value=logo]");
     fromLogo.hidden = logoColors.length === 0;
+    fromLogo.disabled = logoColors.length === 0;
     if (tab === "logo" && !logoColors.length) tab = "dark";
-    [...$("faces").children].forEach(btn =>
-      btn.setAttribute("aria-pressed", String(btn.dataset.face === tab)));
+    set.value = tab;
   }
 
   function setShadow(value) {
@@ -876,7 +874,7 @@
     hint.hidden = !logoUrl;
     if (logoUrl) {
       hint.textContent = "Click either tile to take a color from the logo. "
-        + "Colors found in it are on the From logo tab.";
+        + "Colors found in it are under From logo.";
     }
     $("shadow-toggle").hidden = !logoUrl;
   }
@@ -951,19 +949,14 @@
   $("add").addEventListener("click", () => showForm(null));
   $("cancel").addEventListener("click", showList);
   $("f-kind").addEventListener("change", onKind);
+  $("palette-set").addEventListener("change", e => {
+    tab = e.target.value;
+    renderPalette();
+    paint();
+  });
   $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
   $("shadow-toggle").addEventListener("click", () => repaintShadow(!logoShadow));
   $("f-name").addEventListener("input", paint);
-  [...$("faces").children].forEach(btn => {
-    btn.addEventListener("click", () => {
-      tab = btn.dataset.face;
-      renderFaces();
-      // The tab decides which colors are on the board, so the board has to be
-      // rebuilt. Without this the tabs highlighted and nothing else moved.
-      renderPalette();
-      paint();
-    });
-  });
 
   $("save").addEventListener("click", async () => {
     const svc = formService();

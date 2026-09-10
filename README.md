@@ -406,15 +406,15 @@ them, and those want an uploaded image instead.
 
 Color is a board of sixteen rather than a hex field, on the grounds that
 nobody is typing `#E50914` with a d-pad. The swatch picked is the tile face
-itself, and the tabs decide which sixteen are on offer: Bright for a service
-whose identity is one loud color, Dark and Light for the near-blacks and
-near-whites most of the catalog uses. An earlier version had you pick a bright
+itself, and a dropdown decides which sixteen are on offer: Bright for a
+service whose identity is one loud color, Dark and Light for the near-blacks
+and near-whites most of the catalog uses. An earlier version had you pick a bright
 brand color and then derived a near-black face from it, which meant the swatch
 you clicked was never the color you got.
 
 Three ways in when none of the sixteen is right: click the logo in the preview
-to take the exact pixel under the pointer, switch to the From logo tab, which
-appears once a logo has given up some colors and holds those rather than
+to take the exact pixel under the pointer, choose From logo, which appears in
+that dropdown once a logo has given up some colors and holds those rather than
 mixing them into the other boards, or press "Pick a color off the screen"
 where Chromium offers that.
 
