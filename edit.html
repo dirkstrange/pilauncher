@@ -147,7 +147,11 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.6em;
-    max-width: 12em;
+    /* An explicit width, not a maximum. The swatches size themselves from the
+       column and have no width of their own, so with the tabs moved out of
+       this column there was nothing left to give it one and the whole board
+       collapsed to a few dots. */
+    width: 12em;
   }
   .swatches button {
     aspect-ratio: 1;
@@ -194,30 +198,62 @@
     flex-direction: column;
     gap: 0.4em;
   }
-  .color-preview {
-    /* A definite height, roughly the height of the board beside it. It also
-       has to be definite for the logo below to have something to be a
-       percentage of: left to size itself, the image grew the box instead. */
-    height: 11.5em;
-    border-radius: 12px;
-    display: grid;
-    place-items: center;
-    font-variation-settings: "wght" 700;
-    /* A logo that overruns its box would cover the form underneath it, and
-       this box is the only thing on the page with a height of its own. */
-    overflow: hidden;
+  /* A copy of the tile as the launcher draws it: same 16/10, same corner, the
+     face on a pseudo-element so the unfocused version can be dimmed without
+     draining the logo with it. Kept in step with index.html by hand, which is
+     the cost of previewing one page inside another. */
+  .tile-previews {
+    display: flex;
+    gap: 0.9em;
+    align-items: flex-start;
   }
-  /* Height in absolute units, not a percentage. Chromium does not resolve a
-     percentage height against a grid area even when that area has a definite
-     height, so a percentage here leaves the image at its natural size. Width
-     is fine as a percentage; only the block axis behaves this way. */
-  .color-preview img {
-    max-height: 8em;
-    max-width: 74%;
-    width: auto;
-    height: auto;
+  .tile-previews figure { flex: 1 1 0; min-width: 0; }
+  .tile-previews figcaption {
+    color: var(--haze);
+    font-size: 0.85em;
+    text-align: center;
+    margin-top: 0.35em;
+  }
+  .tile-preview {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    border-radius: 14px;
+    /* Flex, not grid. The logo below is capped as a percentage of this box,
+       and Chromium resolves that against a flex line but not a grid area. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.7em;
+    overflow: hidden;
+    text-align: center;
+  }
+  .tile-preview::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: var(--face, #06122B);
+  }
+  /* The same recede the launcher applies to a tile that is not selected. */
+  .tile-preview.dimmed::before { filter: saturate(0.92) brightness(0.9); }
+  .tile-preview.dimmed img,
+  .tile-preview.dimmed .pv-label { opacity: 0.9; }
+  .tile-preview > * { position: relative; z-index: 1; }
+  .tile-preview img {
+    max-width: 93%;
+    max-height: 87%;
     object-fit: contain;
+    filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.45));
     cursor: crosshair;
+  }
+  .tile-preview img.flat { filter: none; }
+  .pv-label {
+    font-variation-settings: "wdth" 108, "wght" 700;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-size: 1.5em;
+    max-width: 92%;
   }
   .picker-hint {
     color: var(--haze);
@@ -300,17 +336,27 @@
 
     <div class="field">
       <label>Tile color</label>
+      <div class="faces" id="faces">
+        <button type="button" data-nav data-row="faces" data-face="bright">Bright</button>
+        <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
+        <button type="button" data-nav data-row="faces" data-face="light">Light</button>
+        <button type="button" data-nav data-row="faces" data-face="logo" hidden>From logo</button>
+      </div>
       <div class="color-row">
         <div class="color-board">
-          <div class="faces" id="faces">
-            <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
-            <button type="button" data-nav data-row="faces" data-face="light">Light</button>
-            <button type="button" data-nav data-row="faces" data-face="logo" hidden>From logo</button>
-          </div>
           <div class="swatches" id="palette"></div>
         </div>
         <div class="color-side">
-          <div class="color-preview" id="preview">Preview</div>
+          <div class="tile-previews">
+            <figure>
+              <div class="tile-preview" id="preview-on"></div>
+              <figcaption>Focused</figcaption>
+            </figure>
+            <figure>
+              <div class="tile-preview dimmed" id="preview-off"></div>
+              <figcaption>Not focused</figcaption>
+            </figure>
+          </div>
           <p class="picker-hint" id="picker-hint" hidden></p>
         </div>
       </div>
@@ -364,12 +410,22 @@
   let glow = "";           // the brand color the launcher glows when focused
   let logoColors = [];     // colors read out of the logo now in the preview
   let sampledFrom = null;  // the logo those came from, so it is read once
+  let logoStamp = 0;       // cache-buster, changed when the logo changes
 
   // Two boards rather than one. An earlier version had you pick a bright
   // brand color and then quietly derived a near-black face from it, so the
   // swatch you clicked was never the color you got. Here the swatch is the
   // face: the tabs only decide which end of the range is on offer.
   const FACES = {
+    // The original board. A tile face does not have to be a near-black or a
+    // near-white, and a service whose whole identity is one loud color wants
+    // that color on the tile.
+    bright: [
+      "#E50914", "#FF5722", "#FF9800", "#FFC107",
+      "#1CE783", "#01875F", "#00BCD4", "#00A8E1",
+      "#0064FF", "#113CCF", "#4C8DFF", "#7C4DFF",
+      "#C724B1", "#E91E63", "#EDEFF4", "#79839B",
+    ],
     dark: [
       "#121212", "#1A1F2B", "#0F171E", "#000000",
       "#1C0A0A", "#2A1714", "#1E1207", "#0A1A0A",
@@ -577,6 +633,14 @@
     return chosenColor || "#06122B";
   }
 
+  function tabFor(color) {
+    if (!color) return "dark";
+    const n = parseInt(color.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    if (Math.max(r, g, b) - Math.min(r, g, b) >= 40) return "bright";
+    return luminance(color) > 0.6 ? "light" : "dark";
+  }
+
   // Readable text on the tile is arithmetic, not a decision worth handing to
   // whoever is adding a service.
   function inkColor() {
@@ -720,6 +784,13 @@
     $("shadow-toggle").setAttribute("aria-pressed", String(value));
   }
 
+  function repaintShadow(value) {
+    setShadow(value);
+    // The preview draws the shadow, so it has to be redrawn to show the
+    // change rather than leaving the toggle as the only thing that moved.
+    paint();
+  }
+
   function setHidden(value) {
     isHidden = value;
     $("hidden-label").textContent =
@@ -754,51 +825,60 @@
   }
 
   function paint() {
-    const box = $("preview");
-    box.style.background = faceColor();
-    box.style.color = inkColor();
-    box.textContent = "";
+    const face = faceColor();
+    const ink = inkColor();
     const hint = $("picker-hint");
-    if (logoUrl) {
+    ["preview-on", "preview-off"].forEach((id, at) => {
+      const box = $(id);
+      box.textContent = "";
+      box.style.setProperty("--face", face);
+      box.style.color = ink;
+      if (!logoUrl) {
+        const label = document.createElement("span");
+        label.className = "pv-label";
+        label.textContent = $("f-name").value || "Preview";
+        box.appendChild(label);
+        return;
+      }
       const img = document.createElement("img");
       // The filename does not change when a logo is replaced, so the cache
-      // has to be stepped around or the old picture stays on screen.
-      img.src = logoUrl + "?t=" + Date.now();
+      // has to be stepped around. The stamp only moves when the logo does,
+      // or every keystroke in the name field would refetch the picture.
+      img.src = logoUrl + "?t=" + logoStamp;
+      if (!logoShadow) img.className = "flat";
       img.addEventListener("click", e => {
         const picked = pixelAt(img, e);
         if (picked) choose(picked);
         else say("Nothing there to take a color from.", true);
       });
-      img.addEventListener("load", () => {
-        // Read the logo once per image. paint() runs on every keystroke in
-        // the name field, and sampling on each of those would be wasteful.
-        if (sampledFrom === logoUrl) return;
-        sampledFrom = logoUrl;
-        logoColors = sampleLogo(img);
-        // A new tile has no brand color yet, and the boldest color in the
-        // logo is a better guess at one than anything a near-black face can
-        // be turned into.
-        if (!glow) {
-          glow = logoColors.find(c => {
-            const n = parseInt(c.slice(1), 16);
-            const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-            return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
-          }) || "";
-        }
-        renderFaces();
-        renderPalette();
-      });
+      // Read the logo once, off whichever copy loads first.
+      if (at === 0) {
+        img.addEventListener("load", () => {
+          if (sampledFrom === logoUrl) return;
+          sampledFrom = logoUrl;
+          logoColors = sampleLogo(img);
+          // A new tile has no brand color yet, and the boldest color in the
+          // logo is a better guess at one than anything a near-black face
+          // can be turned into.
+          if (!glow) {
+            glow = logoColors.find(c => {
+              const n = parseInt(c.slice(1), 16);
+              const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+              return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
+            }) || "";
+          }
+          renderFaces();
+          renderPalette();
+        });
+      }
       box.appendChild(img);
-      hint.textContent = "Click the logo to take a color from it. "
+    });
+    hint.hidden = !logoUrl;
+    if (logoUrl) {
+      hint.textContent = "Click either tile to take a color from the logo. "
         + "Colors found in it are on the From logo tab.";
-      hint.hidden = false;
-      // Only worth offering while there is a logo for it to apply to.
-      $("shadow-toggle").hidden = false;
-    } else {
-      box.textContent = $("f-name").value || "Preview";
-      hint.hidden = true;
-      $("shadow-toggle").hidden = true;
     }
+    $("shadow-toggle").hidden = !logoUrl;
   }
 
   function showForm(svc) {
@@ -814,8 +894,9 @@
     // A new tile starts on the dark board, which is what most of the
     // catalog uses and what a wall of tiles wants.
     chosenColor = (seed.tile_bg || seed.color || "").toUpperCase();
-    tab = chosenColor && luminance(chosenColor) > 0.6 ? "light" : "dark";
+    tab = tabFor(chosenColor);
     logoUrl = seed.logo || null;
+    logoStamp = Date.now();
     // Cleared per tile, or the colors read out of the last logo stay on the
     // board while a different service is being edited.
     logoColors = [];
@@ -871,7 +952,7 @@
   $("cancel").addEventListener("click", showList);
   $("f-kind").addEventListener("change", onKind);
   $("hidden-toggle").addEventListener("click", () => setHidden(!isHidden));
-  $("shadow-toggle").addEventListener("click", () => setShadow(!logoShadow));
+  $("shadow-toggle").addEventListener("click", () => repaintShadow(!logoShadow));
   $("f-name").addEventListener("input", paint);
   [...$("faces").children].forEach(btn => {
     btn.addEventListener("click", () => {
@@ -918,6 +999,8 @@
     try {
       const res = await api("/logo", { id: id, url: url });
       logoUrl = res.logo;
+      logoStamp = Date.now();
+      sampledFrom = null;
       const guess = res.suggested || {};
       // A color already picked beats a guess, so this only fills an empty one.
       if (guess.color && !chosenColor) {
@@ -963,6 +1046,8 @@
       try {
         const res = await api("/logo", { id: id, data: reader.result, ext: ext });
         logoUrl = res.logo;
+        logoStamp = Date.now();
+        sampledFrom = null;
         paint();
         say("Logo set. Save to keep it.");
       } catch (err) {
@@ -979,6 +1064,10 @@
     try {
       await api("/logo", { id: id, clear: true });
       logoUrl = null;
+      logoColors = [];
+      sampledFrom = null;
+      renderFaces();
+      renderPalette();
       paint();
       say("Logo removed.");
     } catch (err) {
