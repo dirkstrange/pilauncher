@@ -30,6 +30,14 @@ is what a new install starts from, and the live one at
 the launcher and the Pi desktop. Both are bound to compositor hotkeys, because
 a kiosk window swallows keystrokes before any page can see them.
 
+`scripts/pilauncher-health.py` runs once a minute from
+`pilauncher-health.timer` and repairs the audio when a boot with the television
+switched off has left it going nowhere. It is the only part of this that runs
+without anybody asking it to. See "What a boot with the TV off breaks".
+
+`scripts/show-remote-keys.py` prints what a remote is actually sending, which
+is where any argument about a dead button should start.
+
 The server listens on `127.0.0.1` by default, so nothing outside the Pi can
 reach it. `PILAUNCHER_BIND=0.0.0.0` opens the settings page to the house
 network; the endpoints that drive the TV refuse any address but the Pi itself

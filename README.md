@@ -57,6 +57,38 @@ name filled in, one press away from being a tile.
 
 ![Adding an Android app](screenshots/Add_Android_App.png)
 
+## When nobody is watching
+
+The backdrop behind the tiles is the day's Bing wallpaper, blurred back far
+enough that the logos stay readable, replaced every hour.
+
+Leave the launcher alone for ten minutes and those pictures fill the screen
+with a clock over them, crossfading every forty-five seconds. Leave it another
+half hour and the panel powers down, because by then the room is empty and a
+lit television is just electricity and burn-in. Any button on the remote brings
+it straight back.
+
+None of that can happen while you are watching something. The launcher asks
+whether a service is open before it starts, so a long film never trips it.
+
+## It looks after itself
+
+Boot a Raspberry Pi while the television is switched off and the sound never
+arrives. PipeWire asks each HDMI port what it can do exactly once, as it
+starts, and a sleeping TV cannot answer, so it concludes there is no sound card
+and routes everything into a null output that accepts audio and discards it.
+Turning the TV on afterwards changes nothing, because the question is not asked
+twice.
+
+Waydroid has a separate trick, where the Android session reports itself
+perfectly healthy, accepts every request to open an app, and opens nothing.
+
+Both used to need somebody who knew which service to restart. A health check
+now finds the audio one within a minute of the TV waking, and the launcher
+restarts the Android session itself when an app fails to open. The details, and
+the several things that mislead you while diagnosing either, are in the
+technical notes.
+
 ## What it is built on
 
 Python 3 from the standard library, and nothing else. `launcher.py` is a
@@ -89,8 +121,9 @@ cd ~/pilauncher
 ```
 
 `install.sh` installs the packages, writes the systemd user units, adds the
-compositor keybinds, installs the remote's key mapping and starts everything.
-It is safe to re-run, which is also how you apply changes after a `git pull`:
+compositor keybinds, installs the remote's key mapping, enables the health
+check and starts everything. It is safe to re-run, which is also how you apply
+changes after a `git pull`:
 
 ```bash
 cd ~/pilauncher && git pull --ff-only && ./install.sh
@@ -140,8 +173,14 @@ launcher looks like.
 How Widevine actually resolves, and why checking `/opt/WidevineCdm` tells you
 nothing. Why the remote's OK button arrives dead and has to be remapped in
 evdev. What the compositor does with a kiosk window's keystrokes. How the
-catalog gets written without ever losing it, and where it lives. The
-screensaver, the Android session, and the ceilings mentioned above.
+catalog gets written without ever losing it, and where it lives.
+
+Also what a boot with the television switched off quietly breaks, which is more
+than it sounds and none of which looks like a display problem: silence that
+survives turning the TV on, Android windows drawn at the wrong size in the
+middle of the screen, and a perfectly healthy sound card that fails the obvious
+test command. Plus the screensaver, the Android session, and the ceilings
+mentioned above.
 
 `design/` holds the brand kit: the marks, the palette, and the sheet they are
 documented on. Both pages inline those marks rather than fetching them, so
