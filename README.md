@@ -412,9 +412,10 @@ near-black face from it, which meant the swatch you clicked was never the color
 you got.
 
 Three ways in when none of the sixteen is right: click the logo in the preview
-to take the exact pixel under the pointer, use any color found in the logo,
-which are added to the board so the d-pad can reach them, or press "Pick a
-color off the screen" where Chromium offers that.
+to take the exact pixel under the pointer, switch to the From logo tab, which
+appears once a logo has given up some colors and holds those rather than
+mixing them into the other two boards, or press "Pick a color off the screen"
+where Chromium offers that.
 
 The label color follows from how light the face is, and the glow the launcher
 draws around a focused tile keeps whatever brand color the entry already had.

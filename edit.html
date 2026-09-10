@@ -154,6 +154,12 @@
     border-radius: 12px;
     padding: 0;
     position: relative;
+    /* A hairline, because the dark board is sixteen near-blacks on a dark
+       page and without an edge they read as one smudge. Drawn as an outline
+       rather than a border so it does not fight the focus treatment, which
+       owns the border and the box-shadow. */
+    outline: 1px solid rgba(237, 239, 244, 0.14);
+    outline-offset: -1px;
   }
   /* A dot rather than a ring, because the ring slot is taken by the focus
      treatment and the two would fight on the swatch that is both. */
@@ -166,28 +172,48 @@
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55);
   }
   .faces { display: flex; gap: 0.5em; flex-wrap: wrap; }
-  .faces button[aria-pressed="true"] {
+  .faces button[aria-pressed="true"],
+  .toggle[aria-pressed="true"] {
     background: var(--live);
     color: #06122B;
     font-variation-settings: "wght" 500;
   }
+  /* Board on the left, preview filling the space beside it. Halving the
+     swatches left that space empty, and a preview is the one thing here that
+     benefits from being large. */
+  .color-row {
+    display: flex;
+    align-items: stretch;
+    gap: 1.2em;
+    flex-wrap: wrap;
+  }
+  .color-board { flex: none; }
+  .color-side {
+    flex: 1 1 16em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+  }
   .color-preview {
-    height: 4.2em;
+    /* A definite height, roughly the height of the board beside it. It also
+       has to be definite for the logo below to have something to be a
+       percentage of: left to size itself, the image grew the box instead. */
+    height: 11.5em;
     border-radius: 12px;
     display: grid;
     place-items: center;
     font-variation-settings: "wght" 700;
-    margin-bottom: 0.4em;
     /* A logo that overruns its box would cover the form underneath it, and
-       the box is the only thing on this page with a fixed height. */
+       this box is the only thing on the page with a height of its own. */
     overflow: hidden;
   }
-  /* Sized in real units rather than a percentage of the box. A percentage
-     height on a grid item is treated as auto here, so the logo drew at its
-     natural size and swallowed the whole form. */
+  /* Height in absolute units, not a percentage. Chromium does not resolve a
+     percentage height against a grid area even when that area has a definite
+     height, so a percentage here leaves the image at its natural size. Width
+     is fine as a percentage; only the block axis behaves this way. */
   .color-preview img {
-    max-height: 3em;
-    max-width: 60%;
+    max-height: 8em;
+    max-width: 74%;
     width: auto;
     height: auto;
     object-fit: contain;
@@ -196,7 +222,6 @@
   .picker-hint {
     color: var(--haze);
     font-size: 0.85em;
-    margin-bottom: 0.9em;
   }
 
   /* Pinned to the bottom of the screen rather than the bottom of the page.
@@ -273,22 +298,24 @@
       <select id="f-package" data-nav></select>
     </div>
 
-    <div class="color-preview" id="preview">Preview</div>
-    <p class="picker-hint" id="picker-hint" hidden></p>
-
-    <button class="row" id="shadow-toggle" type="button" data-nav hidden>
-      <span class="swatch" id="shadow-mark" style="background:#06122B;color:#79839B">&#10003;</span>
-      <span class="who"><b id="shadow-label">Drop shadow on the logo</b><small>Lifts a flat mark off the tile. Turn it off for a logo that carries its own edge or background</small></span>
-    </button>
-
     <div class="field">
       <label>Tile color</label>
-      <div class="faces" id="faces">
-        <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
-        <button type="button" data-nav data-row="faces" data-face="light">Light</button>
+      <div class="color-row">
+        <div class="color-board">
+          <div class="faces" id="faces">
+            <button type="button" data-nav data-row="faces" data-face="dark">Dark</button>
+            <button type="button" data-nav data-row="faces" data-face="light">Light</button>
+            <button type="button" data-nav data-row="faces" data-face="logo" hidden>From logo</button>
+          </div>
+          <div class="swatches" id="palette"></div>
+        </div>
+        <div class="color-side">
+          <div class="color-preview" id="preview">Preview</div>
+          <p class="picker-hint" id="picker-hint" hidden></p>
+        </div>
       </div>
-      <div class="swatches" id="palette"></div>
     </div>
+
 
     <div class="field">
       <label for="f-note">Note (only ever shown here)</label>
@@ -305,6 +332,7 @@
       <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
       <button id="upload" type="button" data-nav>Upload a logo</button>
       <button id="drop-logo" type="button" data-nav>Remove logo</button>
+      <button class="toggle" id="shadow-toggle" type="button" data-nav hidden>Logo shadow: on</button>
     </div>
 
     <div class="actions">
@@ -395,14 +423,18 @@
   // inside is by position, and running off the top or bottom hands over to
   // the field either side rather than stopping dead.
   function moveInGroup(key, selector, columns) {
-    const group = [...document.querySelectorAll(selector)];
+    const group = [...document.querySelectorAll(selector)]
+      .filter(el => el.offsetParent !== null);
     const at = group.indexOf(document.activeElement);
     if (at < 0) return false;
+    // A column count of zero means one row however wide it happens to be, so
+    // up and down always leave it. The tab row grows and shrinks.
+    const across = columns || group.length;
     let to = -1;
     if (key === "ArrowLeft") to = at - 1;
     else if (key === "ArrowRight") to = at + 1;
-    else if (key === "ArrowUp") to = at - columns;
-    else if (key === "ArrowDown") to = at + columns;
+    else if (key === "ArrowUp") to = at - across;
+    else if (key === "ArrowDown") to = at + across;
     else return false;
     if (to >= 0 && to < group.length) return land(group[to]);
     if (key !== "ArrowUp" && key !== "ArrowDown") return false;
@@ -418,7 +450,7 @@
     // The tabs are a row two wide and one tall, so a column count of two
     // means left and right walk them while up and down always leave.
     if (row.row === "faces") {
-      if (moveInGroup(e.key, "[data-row=faces]", 2)) { e.preventDefault(); return; }
+      if (moveInGroup(e.key, "[data-row=faces]", 0)) { e.preventDefault(); return; }
     }
     // The color board is a grid, so it gets grid movement. The flat list
     // below would walk it one swatch at a time, which is sixteen presses to
@@ -645,10 +677,7 @@
   function renderPalette() {
     const box = $("palette");
     box.textContent = "";
-    const colors = FACES[tab].slice();
-    // Whatever came out of the logo goes on the board too, so it can be
-    // reached with the d-pad rather than only by clicking the picture.
-    logoColors.forEach(c => { if (!colors.includes(c)) colors.push(c); });
+    const colors = tab === "logo" ? logoColors.slice() : FACES[tab].slice();
     // A color read off a logo will rarely be one of the sixteen, so it joins
     // the board rather than being quietly rounded to the nearest.
     if (chosenColor && !colors.includes(chosenColor)) colors.push(chosenColor);
@@ -673,15 +702,22 @@
   }
 
   function renderFaces() {
+    // The logo tab only exists while a logo has actually given up some
+    // colors, and selecting it and then removing the logo has to land
+    // somewhere, so it falls back to the dark board.
+    const fromLogo = $("faces").querySelector("[data-face=logo]");
+    fromLogo.hidden = logoColors.length === 0;
+    if (tab === "logo" && !logoColors.length) tab = "dark";
     [...$("faces").children].forEach(btn =>
       btn.setAttribute("aria-pressed", String(btn.dataset.face === tab)));
   }
 
   function setShadow(value) {
     logoShadow = value;
-    $("shadow-label").textContent =
-      value ? "Drop shadow on the logo" : "No drop shadow on the logo";
-    $("shadow-mark").textContent = value ? "✓" : "✕";
+    // Said in words as well as shown by the fill, since a button that is only
+    // on by virtue of its color is a guess from across a room.
+    $("shadow-toggle").textContent = "Logo shadow: " + (value ? "on" : "off");
+    $("shadow-toggle").setAttribute("aria-pressed", String(value));
   }
 
   function setHidden(value) {
@@ -749,11 +785,12 @@
             return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
           }) || "";
         }
+        renderFaces();
         renderPalette();
       });
       box.appendChild(img);
       hint.textContent = "Click the logo to take a color from it. "
-        + "Colors found in it are added to the board below.";
+        + "Colors found in it are on the From logo tab.";
       hint.hidden = false;
       // Only worth offering while there is a logo for it to apply to.
       $("shadow-toggle").hidden = false;
