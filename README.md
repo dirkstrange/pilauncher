@@ -259,6 +259,120 @@ Older Pi OS releases used Wayfire, and much older ones X11. The keybind syntax
 differs for each. Most kiosk guides online are written for X11 and will not
 apply.
 
+## The remote control
+
+The Pi is driven from a G20-style air-mouse remote, the kind with a D-pad and
+media keys on one face and a numeric keypad on the other, sold under a rotating
+cast of brand names. Ours talks to the Pi over its own 2.4GHz dongle rather than
+Bluetooth. That dongle enumerates as USB `4842:0001` and presents two input
+devices: a keyboard node carrying the buttons, and a mouse node carrying the
+gyro pointer.
+
+Most of the buttons need nothing from us. The arrows, volume, play/pause,
+previous and next, page up and down, mute, the number row and the Del key all
+emit ordinary evdev codes that Chromium understands, and `index.html` already
+walks the tile grid from the arrow keys.
+
+### Why OK arrived dead
+
+The OK button reports HID consumer usage `0x0c/0x41`, which the kernel
+translates into `KEY_SELECT`. The xkb evdev keycode table in
+`/usr/share/X11/xkb/keycodes/evdev` has an entry for that code, but nothing in
+`/usr/share/X11/xkb/symbols/` binds a keysym to it. The keypress therefore
+reaches every Wayland client without a name attached. Chromium never raises an
+`Enter` DOM event, the handler in `index.html` never matches, and the tile under
+the cursor never opens.
+
+No binding downstream can recover this. By the time labwc or the page sees the
+event, the key is already nameless, so the repair has to happen in evdev while
+the raw scancode is still in hand. That is what
+[udev/70-pilauncher-remote.hwdb](udev/70-pilauncher-remote.hwdb) does. hwdb
+matches on the scancode the hardware sent rather than the code the kernel picked
+for it, which is why the rule reads `KEYBOARD_KEY_c0041=enter`. The syntax is
+documented in [systemd's hwdb man page](https://www.freedesktop.org/software/systemd/man/latest/hwdb.html).
+
+`install.sh` puts the rule in place. By hand it is three commands:
+
+```bash
+sudo install -o root -g root -m 0644 \
+  udev/70-pilauncher-remote.hwdb /etc/udev/hwdb.d/70-pilauncher-remote.hwdb
+sudo systemd-hwdb update
+sudo udevadm trigger --subsystem-match=input --action=change
+```
+
+The third one is easy to skip and the reason nothing appears to happen without
+it. The compiled database is consulted when a device is added, so a remote that
+is already plugged in keeps its old keymap until something re-triggers it.
+
+A rule can be checked before it goes anywhere near the system, by compiling it
+into a throwaway root and querying it with the remote's real device signature:
+
+```bash
+mkdir -p /tmp/hwdbtest/etc/udev/hwdb.d
+cp udev/70-pilauncher-remote.hwdb /tmp/hwdbtest/etc/udev/hwdb.d/
+systemd-hwdb update --root /tmp/hwdbtest
+systemd-hwdb query --root /tmp/hwdbtest "evdev:$(cat /sys/class/input/input4/modalias)"
+```
+
+A match prints the properties that would be applied. Silence means the match
+line is wrong.
+
+### The rest of the buttons
+
+The back arrow sends `XF86Back`. It is deliberately not bound in labwc, so that
+inside a service window Chromium's own history-back still works and the window
+survives. `index.html` treats it like Escape, so on the tile page it still
+cancels a move or closes.
+
+Home sends `XF86HomePage` and is bound to `back.sh`, which is the one button
+that always returns to the tiles.
+
+The Menu button, bottom right, the one that also toggles the backlight when
+held, sends the `Menu` keysym and is bound to `desktop.sh`. This matters more
+than it looks: the remote has no Ctrl or Alt key, so `A-Escape`, `A-F4` and
+`C-A-d` cannot be typed on it at all, and without this there is no way to reach
+the Pi desktop from the couch.
+
+The mic button sends `XF86VoiceCommand`. It is valid and unbound, since there is
+nothing here to point it at.
+
+### Mouse mode changes what OK sends
+
+The cursor button toggles the gyro pointer. That toggle is handled inside the
+remote and sends nothing to the Pi, so it never shows up in a capture. While it
+is on, OK stops sending a key and sends a left click instead, and the D-pad
+drives the pointer rather than the tile cursor. Tiles still open, by being
+clicked rather than selected, which is what made the OK button look
+intermittently broken rather than mode-dependent while it was unmapped. Leave
+mouse mode off.
+
+### The power button really does power off
+
+It sends `KEY_POWER` and the Pi acts on it immediately, with no confirmation
+step. Worth knowing before testing buttons one at a time.
+
+### Working out what a different remote sends
+
+[scripts/show-remote-keys.py](scripts/show-remote-keys.py) watches every
+readable node under `/dev/input` at once and prints the evdev key name and
+hardware scancode for each press, naming the device the press came from. Being
+in the `input` group is enough to run it, so it needs no sudo:
+
+```bash
+id -nG | grep -q input && ./scripts/show-remote-keys.py
+```
+
+A button that prints nothing at all is handled in the remote's firmware and
+never reaches the host. A button that prints a key name but does nothing in
+Chromium is the `KEY_SELECT` case above. To confirm, check whether a keysym
+exists for it, remembering that xkb keycodes are the evdev code plus eight:
+
+```bash
+grep -rn "<I361>" /usr/share/X11/xkb/symbols/
+```
+
+No output means no keysym, and an hwdb remap is the fix.
+
 ## Leaving the launcher
 
 The launcher covers the desktop and restarts itself if you close its window, so
