@@ -177,6 +177,25 @@
     display: grid;
     place-items: center;
     font-variation-settings: "wght" 700;
+    margin-bottom: 0.4em;
+    /* A logo that overruns its box would cover the form underneath it, and
+       the box is the only thing on this page with a fixed height. */
+    overflow: hidden;
+  }
+  /* Sized in real units rather than a percentage of the box. A percentage
+     height on a grid item is treated as auto here, so the logo drew at its
+     natural size and swallowed the whole form. */
+  .color-preview img {
+    max-height: 3em;
+    max-width: 60%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    cursor: crosshair;
+  }
+  .picker-hint {
+    color: var(--haze);
+    font-size: 0.85em;
     margin-bottom: 0.9em;
   }
 
@@ -232,6 +251,7 @@
   <!-- ---------- form view ---------- -->
   <section id="form-view" hidden>
     <div class="color-preview" id="preview">Preview</div>
+    <p class="picker-hint" id="picker-hint" hidden></p>
 
     <div class="field">
       <label for="f-name">Name</label>
@@ -281,6 +301,7 @@
     </button>
 
     <div class="actions">
+      <button id="eyedropper" type="button" data-nav hidden>Pick a color off the screen</button>
       <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
       <button id="upload" type="button" data-nav>Upload a logo</button>
       <button id="drop-logo" type="button" data-nav>Remove logo</button>
@@ -311,6 +332,8 @@
   let isHidden = false;
   let chosenColor = "";    // the brand color, the one color actually picked
   let face = "dark";       // what the tile face is made of: dark, light, brand
+  let logoColors = [];     // colors read out of the logo now in the preview
+  let sampledFrom = null;  // the logo those came from, so it is read once
 
   // A board of sixteen instead of a hex box. Chosen to cover the streaming
   // brands already in the catalog and leave room either side, with two
@@ -543,27 +566,92 @@
     return luminance(bg) > 0.6 ? "light" : "dark";
   }
 
+  function hex(r, g, b) {
+    return "#" + [r, g, b]
+      .map(v => v.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+
+  // Colors taken out of the logo itself, which are the ones most likely to be
+  // wanted and are never in a fixed board of sixteen.
+  function sampleLogo(img) {
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 96 / Math.max(img.naturalWidth, img.naturalHeight));
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let data;
+    try {
+      data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    } catch (err) {
+      // Only reachable if a logo ever came from another origin, which would
+      // taint the canvas. Losing the extra swatches is the whole cost.
+      return [];
+    }
+    const counts = new Map();
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] < 128) continue;
+      // Bucketed, or a photograph returns several hundred near-identical
+      // shades and the row becomes a gradient rather than a set of choices.
+      const key = (data[i] >> 5) * 64 + (data[i + 1] >> 5) * 8 + (data[i + 2] >> 5);
+      const seen = counts.get(key);
+      if (seen) { seen.n += 1; seen.r += data[i]; seen.g += data[i + 1]; seen.b += data[i + 2]; }
+      else counts.set(key, { n: 1, r: data[i], g: data[i + 1], b: data[i + 2] });
+    }
+    return [...counts.values()]
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 8)
+      .map(c => hex(Math.round(c.r / c.n), Math.round(c.g / c.n), Math.round(c.b / c.n)));
+  }
+
+  function pixelAt(img, event) {
+    const box = img.getBoundingClientRect();
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0);
+    const x = Math.floor((event.clientX - box.left) / box.width * img.naturalWidth);
+    const y = Math.floor((event.clientY - box.top) / box.height * img.naturalHeight);
+    try {
+      const px = ctx.getImageData(x, y, 1, 1).data;
+      // A transparent pixel is the space around a mark, not a choice.
+      return px[3] < 8 ? null : hex(px[0], px[1], px[2]);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function choose(color) {
+    chosenColor = color;
+    renderPalette();
+    paint();
+  }
+
   function renderPalette() {
     const box = $("palette");
     box.textContent = "";
     const colors = PALETTE.slice();
+    // Whatever came out of the logo goes on the board too, so it can be
+    // reached with the d-pad rather than only by clicking the picture.
+    logoColors.forEach(c => { if (!colors.includes(c)) colors.push(c); });
     // A color read off a logo will rarely be one of the sixteen, so it joins
     // the board rather than being quietly rounded to the nearest.
     if (chosenColor && !colors.includes(chosenColor)) colors.push(chosenColor);
-    colors.forEach(hex => {
+    colors.forEach(value => {
       const swatch = document.createElement("button");
       swatch.type = "button";
       swatch.dataset.grid = "palette";
       swatch.setAttribute("data-nav", "");
-      swatch.setAttribute("aria-label", hex);
-      swatch.setAttribute("aria-pressed", String(hex === chosenColor));
-      swatch.style.background = hex;
+      swatch.setAttribute("aria-label", value);
+      swatch.setAttribute("aria-pressed", String(value === chosenColor));
+      swatch.style.background = value;
       swatch.addEventListener("click", () => {
-        chosenColor = hex;
+        chosenColor = value;
         // Marked in place rather than re-rendered, so the swatch keeps focus
         // and the d-pad does not drop back to the start of the board.
         [...box.children].forEach(el =>
-          el.setAttribute("aria-pressed", String(el.getAttribute("aria-label") === hex)));
+          el.setAttribute("aria-pressed", String(el.getAttribute("aria-label") === value)));
         paint();
       });
       box.appendChild(swatch);
@@ -613,15 +701,32 @@
     box.style.background = faceColor();
     box.style.color = inkColor();
     box.textContent = "";
+    const hint = $("picker-hint");
     if (logoUrl) {
       const img = document.createElement("img");
       // The filename does not change when a logo is replaced, so the cache
       // has to be stepped around or the old picture stays on screen.
       img.src = logoUrl + "?t=" + Date.now();
-      img.style.height = "70%";
+      img.addEventListener("click", e => {
+        const picked = pixelAt(img, e);
+        if (picked) choose(picked);
+        else say("Nothing there to take a color from.", true);
+      });
+      img.addEventListener("load", () => {
+        // Read the logo once per image. paint() runs on every keystroke in
+        // the name field, and sampling on each of those would be wasteful.
+        if (sampledFrom === logoUrl) return;
+        sampledFrom = logoUrl;
+        logoColors = sampleLogo(img);
+        renderPalette();
+      });
       box.appendChild(img);
+      hint.textContent = "Click the logo to take a color from it. "
+        + "Colors found in it are added to the board above.";
+      hint.hidden = false;
     } else {
       box.textContent = $("f-name").value || "Preview";
+      hint.hidden = true;
     }
   }
 
@@ -639,9 +744,13 @@
     // A new tile starts dark, which is what most of the catalog uses and what
     // a wall of tiles wants. An existing one keeps whatever it already has.
     face = editing ? inferFace(seed) : "dark";
+    logoUrl = seed.logo || null;
+    // Cleared per tile, or the colors read out of the last logo stay on the
+    // board while a different service is being edited.
+    logoColors = [];
+    sampledFrom = null;
     renderPalette();
     renderFaces();
-    logoUrl = seed.logo || null;
     $("remove").hidden = !editing;
     setHidden(Boolean(seed.hidden));
     fillPackages(seed.package || "");
@@ -737,6 +846,23 @@
       say(err.message, true);
     }
   });
+
+  // Chromium can hand over any pixel on screen, which beats every other way
+  // of matching a color to something already showing. Offered only where the
+  // API exists, and it can still be refused at the moment of use.
+  if (typeof window.EyeDropper === "function") {
+    $("eyedropper").hidden = false;
+    $("eyedropper").addEventListener("click", async () => {
+      try {
+        const result = await new window.EyeDropper().open();
+        choose(result.sRGBHex.toUpperCase());
+        say("Took " + result.sRGBHex.toUpperCase() + " off the screen.");
+      } catch (err) {
+        // Cancelling raises here too, and a cancel is not worth a warning.
+        say("");
+      }
+    });
+  }
 
   $("upload").addEventListener("click", () => $("file").click());
 
