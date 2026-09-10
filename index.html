@@ -50,16 +50,55 @@
     row-gap: 3vh;
   }
 
+  /* ---- splash ----
+     Shown once when the shell window starts, not on every paint of this page.
+     Coming back from the settings page is a fresh page load in the same
+     window, and replaying a five second animation on the way back from
+     changing a colour would wear out fast. */
+  #splash {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--ink);
+    display: grid;
+    place-items: center;
+    animation: splash 5s ease forwards;
+  }
+  #splash img {
+    width: min(52vw, 62vh);
+    height: auto;
+  }
+  @keyframes splash {
+    0%   { opacity: 0; }
+    22%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
   /* ---- header ---- */
   header {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
+    gap: 1.5vw;
   }
+  #brand {
+    height: clamp(40px, 4.4vw, 84px);
+    width: auto;
+  }
+  /* The gear sits inboard of the clock rather than in the corner itself, so
+     the two read as one group against the right edge. */
+  #corner {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 1.3vw, 26px);
+  }
+  #stamp { text-align: right; }
   #stamp {
     display: flex;
     flex-direction: column;
     gap: 0.28em;
+    align-items: flex-end;
   }
   #clock {
     font-size: clamp(24px, 2.8vw, 54px);
@@ -357,17 +396,21 @@
 </style>
 </head>
 <body>
+<div id="splash" aria-hidden="true"><img src="/logo-full.png" alt=""></div>
 <div id="shell">
   <header>
-    <div id="stamp">
-      <div id="clock">--:--</div>
-      <div id="date"></div>
+    <img id="brand" src="/logo-small.png" alt="Pi Media">
+    <div id="corner">
+      <button id="gear" type="button" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.48.48 0 0 0 .12-.61l-1.92-3.32a.48.48 0 0 0-.59-.22l-2.39.96a7.02 7.02 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.48.48 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.23.41.47.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
+        </svg>
+      </button>
+      <div id="stamp">
+        <div id="clock">--:--</div>
+        <div id="date"></div>
+      </div>
     </div>
-    <button id="gear" type="button" aria-label="Settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M19.14 12.94a7.07 7.07 0 0 0 0-1.88l2.03-1.58a.48.48 0 0 0 .12-.61l-1.92-3.32a.48.48 0 0 0-.59-.22l-2.39.96a7.02 7.02 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58a7.07 7.07 0 0 0 0 1.88l-2.03 1.58a.48.48 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.23.41.47.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.12-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.48.48 0 0 0-.12-.61zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z" />
-      </svg>
-    </button>
   </header>
 
   <div id="grid" role="listbox" aria-label="Services"></div>
@@ -415,6 +458,31 @@
   // rather than any tile, which is how it stays reachable without a pointer.
   const GEAR = -1;
   const gear = document.getElementById("gear");
+
+  /* ---------- splash ---------- */
+  (() => {
+    const splash = document.getElementById("splash");
+    if (!splash) return;
+    // sessionStorage lasts as long as the browser session, which for the
+    // kiosk shell means one run of the window. That is exactly the right
+    // scope: the splash plays when the launcher starts, and not again when
+    // this page is loaded afresh on the way back from the settings page.
+    let seen = false;
+    try {
+      seen = sessionStorage.getItem("splashed") === "1";
+      sessionStorage.setItem("splashed", "1");
+    } catch (err) {
+      // Storage can be refused outright. Showing the splash twice is a much
+      // smaller problem than the page failing to start.
+    }
+    if (seen) { splash.remove(); return; }
+    const drop = () => splash.remove();
+    splash.addEventListener("animationend", drop, { once: true });
+    // A way past it, because five seconds is a long time once you know what
+    // the launcher looks like.
+    ["keydown", "mousedown"].forEach(evt =>
+      document.addEventListener(evt, drop, { once: true }));
+  })();
 
   /* ---------- clock ---------- */
   function tick() {
