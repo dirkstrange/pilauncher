@@ -140,8 +140,20 @@
   .actions { display: flex; gap: 0.5em; flex-wrap: wrap; margin-top: 1em; }
   /* Sits under the preview it acts on, so the logo controls read as one
      group rather than as three fields of distance. */
-  .logo-actions { margin-top: 0.6em; }
-  .color-board .actions { margin-top: 0.6em; }
+  .logo-actions { margin-top: 0; margin-bottom: 0.7em; }
+  /* Stacked under the board and matched to its width, so the left column
+     reads as one object rather than a board with oddments beneath it. */
+  .board-extras {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+    margin-top: 0.6em;
+  }
+  .board-extras button { width: 12em; }
+  /* The column is stretched to match the preview beside it, so the last
+     control is pushed to the foot of it rather than leaving a hole. */
+  .color-board { display: flex; flex-direction: column; }
+  #eyedropper { width: 12em; margin-top: auto; }
   .primary { background: var(--live); color: #06323E; font-variation-settings: "wght" 500; }
   .danger  { background: transparent; border-color: var(--warn); color: var(--warn); }
 
@@ -221,13 +233,17 @@
     flex-direction: column;
     gap: 0.4em;
   }
+  .tile-previews { flex: 1; min-height: 0; display: flex; }
   /* A copy of the tile as the launcher draws it: same shape, same corner,
      same logo sizing. Kept in step with index.html by hand, which is the
      cost of previewing one page inside another and has already caught this
      preview out once. */
-  .tile-previews { max-width: 26em; }
+
   .tile-preview {
     position: relative;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
     /* Matches .tile in index.html, which went to 16/9 when the grid became
        five across. This is the second thing on this preview to fall behind
        that file; if a third appears, the shared numbers want extracting. */
@@ -367,23 +383,23 @@
             <option value="logo">From logo</option>
           </select>
           <div class="swatches" id="palette"></div>
-          <div class="actions">
-            <button id="eyedropper" type="button" data-nav hidden>Pick a color off the screen</button>
+          <div class="board-extras">
+            <button class="toggle" id="shadow-toggle" type="button" data-nav hidden>Logo shadow: on</button>
           </div>
+          <button id="eyedropper" type="button" data-nav hidden>Pick from screen</button>
         </div>
         <div class="color-side">
+          <div class="actions logo-actions">
+            <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
+            <button id="upload" type="button" data-nav>Upload a logo</button>
+            <button id="drop-logo" type="button" data-nav>Remove logo</button>
+          </div>
           <div class="logo-size" id="logo-size" hidden>
             <label for="f-scale">Logo size <span id="scale-value">100%</span></label>
             <input id="f-scale" type="range" min="0.4" max="1.4" step="0.05" value="1" data-nav>
           </div>
           <div class="tile-previews">
             <div class="tile-preview" id="preview-on"></div>
-          </div>
-          <div class="actions logo-actions">
-            <button id="fetch" type="button" data-nav>Fetch logo and colors</button>
-            <button id="upload" type="button" data-nav>Upload a logo</button>
-            <button id="drop-logo" type="button" data-nav>Remove logo</button>
-            <button class="toggle" id="shadow-toggle" type="button" data-nav hidden>Logo shadow: on</button>
           </div>
         </div>
       </div>
