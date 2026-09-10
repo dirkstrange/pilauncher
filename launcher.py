@@ -19,6 +19,8 @@ Environment overrides:
     PILAUNCHER_WALLPAPER_FEEDS  bing,apod,nasa-library,epic (default bing,apod)
     PILAUNCHER_NASA_QUERY search terms for the nasa-library feed
     PILAUNCHER_LOGOS      directory of service logo images
+    PILAUNCHER_SERVICES   the live catalog (default is beside the profiles,
+                          seeded from the copy in the checkout)
     PILAUNCHER_BIND       listen address (default 127.0.0.1; 0.0.0.0 opens
                           the settings page to the LAN, never TV control)
 """
@@ -50,9 +52,15 @@ PROFILE_ROOT = Path(
 )
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PILAUNCHER_PORT", "8800"))
-# Named once because the catalog is now written through the API as well as
-# read, and both paths have to agree on which file that is.
-SERVICES_FILE = BASE / "services.json"
+# The catalog in the checkout is the one the project ships. The live one sits
+# with the rest of this machine's state, because the settings page writes to it
+# and a file that git tracks cannot be edited by the app without turning every
+# tile someone adds into a dirty working tree and a failed pull. The shipped
+# copy is seeded into place the first time the daemon runs.
+DEFAULT_SERVICES = BASE / "services.json"
+SERVICES_FILE = Path(
+    os.environ.get("PILAUNCHER_SERVICES", PROFILE_ROOT.parent / "services.json")
+)
 # Editing from another machine is opt-in: set PILAUNCHER_BIND=0.0.0.0 to open
 # the settings page to a browser on the LAN. The endpoints below stay refused
 # to every address but this one regardless, so opening that door lets the
@@ -136,8 +144,17 @@ _android: str | None = None
 _lock = threading.Lock()
 
 
+def seed_catalog() -> None:
+    """Put the shipped catalog in place if this machine has none yet."""
+    if SERVICES_FILE.exists():
+        return
+    SERVICES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(DEFAULT_SERVICES, SERVICES_FILE)
+
+
 def load_catalog() -> list[dict]:
     """The catalog as written in services.json, in file order."""
+    seed_catalog()
     with open(SERVICES_FILE, encoding="utf-8") as fh:
         return json.load(fh)
 

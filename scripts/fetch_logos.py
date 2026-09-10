@@ -210,7 +210,13 @@ def main() -> int:
     dest = Path(args.dir)
     dest.mkdir(parents=True, exist_ok=True)
 
-    with io.open(BASE / "services.json", encoding="utf-8") as fh:
+    # The live catalog, the one the settings page edits, rather than the copy
+    # in the checkout. They part company the moment a tile is added, and it is
+    # the added tile that wants a logo.
+    catalog = Path(os.environ.get("PILAUNCHER_SERVICES", DEFAULT_DIR.parent / "services.json"))
+    if not catalog.is_file():
+        catalog = BASE / "services.json"
+    with io.open(catalog, encoding="utf-8") as fh:
         services = json.load(fh)
     if args.ids:
         services = [s for s in services if s["id"] in args.ids]

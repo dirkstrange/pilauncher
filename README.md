@@ -26,7 +26,9 @@ those is fixable from this end.
 - `launcher.py` runs a small HTTP server on `127.0.0.1:8800`. It serves the
   tile page and starts a Chromium window when you pick something.
 - `index.html` is that page. Arrow keys move, Enter opens, Escape closes.
-- `services.json` is the catalog of services. Edit it to add or remove tiles;
+- `services.json` is the catalog of services. The gear in the corner edits the
+  live copy of it; the one here is the default a new install starts from.
+  Edit it to add or remove tiles;
   nothing else in the code knows what Netflix is.
 - `back.sh` closes whatever service is open. It gets bound to a hotkey.
 - `desktop.sh` switches between the launcher and the Pi desktop, also bound
@@ -430,7 +432,21 @@ What that does not open is control of the TV. `/launch`, `/close` and
 not the Pi itself, whatever the daemon is bound to. Someone on the network can
 edit the catalog and cannot start playing something in the living room.
 
-### How the catalog is written
+### Where the catalog lives, and how it is written
+
+There are two copies of `services.json`. The one in the checkout is the catalog
+the project ships. The live one is at
+`~/.local/share/pilauncher/services.json`, seeded from the shipped copy the
+first time the daemon runs, and that is the one the settings page edits.
+
+They are separate for a plain reason: git tracks the shipped copy, so an app
+that wrote to it would turn every tile you added into a dirty working tree and
+a `git pull` that refuses to run. Editing the live copy leaves deployment
+alone. `PILAUNCHER_SERVICES` overrides its location.
+
+The shipped copy is still worth changing when a default belongs in the project
+rather than on one machine, but it reaches a running Pi only on a fresh
+install, since seeding does not overwrite a catalog that already exists.
 
 `services.json` is the entire launcher, so a half-written file costs every tile
 at once. Writes land in a temporary file, get an fsync, and are renamed over
