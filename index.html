@@ -133,8 +133,8 @@
     gap: clamp(8px, 0.75vw, 14px);
   }
   #brand .mark {
-    width: clamp(26px, 2.3vw, 44px);
-    height: clamp(26px, 2.3vw, 44px);
+    width: clamp(28px, 2.5vw, 48px);
+    height: clamp(28px, 2.5vw, 48px);
     flex: none;
     color: var(--cyan);
   }
@@ -194,16 +194,16 @@
      button on the remote reaches the desktop without any tile at all. */
   #gear {
     border: 0;
-    background: var(--ink-raised);
-    color: var(--haze);
+    background: transparent;
+    color: var(--chalk);
+    opacity: 0.45;
     width: clamp(44px, 3.6vw, 68px);
     height: clamp(44px, 3.6vw, 68px);
     border-radius: 50%;
     display: grid;
     place-items: center;
     cursor: pointer;
-    transition: transform 140ms ease, background 140ms ease,
-                color 140ms ease, box-shadow 140ms ease;
+    transition: transform 140ms ease, opacity 140ms ease, color 140ms ease;
   }
   #gear svg {
     width: 54%;
@@ -211,12 +211,9 @@
     fill: currentColor;
   }
   #gear.focused {
-    background: var(--cyan);
-    color: #06323E;
+    opacity: 1;
+    color: var(--cyan);
     transform: scale(1.12);
-    box-shadow:
-      0 0 46px -8px var(--cyan),
-      0 14px 30px -14px rgba(0, 0, 0, 0.9);
   }
 
   /* ---- grid ---- */
