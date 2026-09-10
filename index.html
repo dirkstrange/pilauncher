@@ -12,17 +12,20 @@
     --ink:        #1A1F2B;
     --ink-raised: #141824;
     --chalk:      #EDEFF4;
+    /* The ring around a tile being moved, so picking one up reads as a
+       different state rather than a slightly bigger focus. */
+    --live-ring:  #4C8DFF;
     --haze:       #79839B;
     --safe-x: 4.5vw;
     --safe-y: 4vh;
-    --gap: 1.6vw;
+    --gap: 1.2vw;
 
     /* How far an unfocused tile recedes. 1 is no change at all; the effect
        started at 0.5 brightness, which turned the light tiles grey. Kept as
        variables so the strength is one place to adjust. */
-    --dim-brightness: 0.9;
-    --dim-saturate: 0.92;
-    --dim-opacity: 0.9;
+    --dim-brightness: 0.72;
+    --dim-saturate: 0.78;
+    --dim-opacity: 0.62;
     /* Stronger while a tile is being moved, since that is a modal state and
        wants to read differently from ordinary focus. */
     --arrange-brightness: 0.62;
@@ -91,7 +94,7 @@
     gap: 1.5vw;
   }
   #brand {
-    height: clamp(40px, 4.4vw, 84px);
+    height: clamp(30px, 2.7vw, 52px);
     width: auto;
   }
   /* The gear sits inboard of the clock rather than in the corner itself, so
@@ -109,16 +112,18 @@
     align-items: flex-end;
   }
   #clock {
-    font-size: clamp(24px, 2.8vw, 54px);
-    font-variation-settings: "wdth" 78, "wght" 500;
+    font-size: clamp(16px, 1.5vw, 28px);
+    opacity: 0.72;
+    font-variation-settings: "wdth" 78, "wght" 400;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
     line-height: 1;
   }
   #date {
-    font-size: clamp(13px, 1.15vw, 22px);
+    font-size: clamp(11px, 0.82vw, 15px);
     font-variation-settings: "wdth" 100, "wght" 400;
-    color: var(--haze);
+    color: var(--chalk);
+    opacity: 0.45;
   }
 
   /* Leaving the launcher was a tile at the end of the grid, which put it in
@@ -162,7 +167,7 @@
        scroll away, which reads as disorganised long before it reads as big.
        Six fits the whole catalog and is still far above what is legible from
        a sofa. */
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: var(--gap);
     /* "safe" keeps the rows centred while they fit, but falls back to
        start-alignment once they overflow. Plain "center" pushes the first row
@@ -183,20 +188,19 @@
        blur reaches noticeably further than the nominal blur/2, and
        scale(1.07) magnifies the shadow along with the tile, so the earlier
        52px was not enough. */
-    padding: 64px var(--safe-x);
+    padding: 16px var(--safe-x);
     margin: -3vh calc(-1 * var(--safe-x));
-    scroll-padding: 64px 0;
+    scroll-padding: 16px 0;
     scrollbar-width: none;
   }
   #grid::-webkit-scrollbar { display: none; }
-  @media (max-width: 1500px) { #grid { grid-template-columns: repeat(5, 1fr); } }
   @media (max-width: 1200px) { #grid { grid-template-columns: repeat(4, 1fr); } }
   @media (max-width: 900px)  { #grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 640px)  { #grid { grid-template-columns: repeat(2, 1fr); } }
 
   .tile {
     position: relative;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 16 / 9;
     border: 0;
     border-radius: 14px;
     background: transparent;
@@ -253,8 +257,8 @@
      centred at the same weight, so a text tile reads as its own treatment
      rather than as a logo that failed to arrive. */
   .tile .logo {
-    max-width: 93%;
-    max-height: 87%;
+    max-width: 78%;
+    max-height: 62%;
     object-fit: contain;
     /* Lifts flat marks off a saturated tile without touching photographic
        icons noticeably. */
@@ -274,12 +278,21 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+  /* The ring sits in the gutter rather than on the tile, which is the whole
+     point of the offset: half these tiles are white, and a light ring drawn
+     flush to the edge of a white tile is not a ring at all. It replaces a
+     bloom in the tile's own brand color, which was invisible against a row of
+     bright logos and cost the grid 64px of padding at every edge to keep from
+     being clipped. */
   .tile.focused {
     transform: scale(1.07);
     z-index: 2;
-    box-shadow:
-      0 0 56px -12px var(--tint),
-      0 20px 40px -16px rgba(0, 0, 0, 0.9);
+    outline: 3px solid var(--chalk);
+    outline-offset: 5px;
+    box-shadow: 0 18px 36px -20px rgba(0, 0, 0, 0.9);
+    /* Promoted only while focused. On all twenty at once this would be twenty
+       compositor layers for no gain. */
+    will-change: transform;
   }
 
   /* A tile that has been picked up. Lifted further than a focused tile and
@@ -288,9 +301,9 @@
   .tile.moving {
     z-index: 3;
     transform: scale(1.12) rotate(-1.4deg);
-    box-shadow:
-      0 0 80px -10px var(--tint),
-      0 32px 64px -20px rgba(0, 0, 0, 0.95);
+    outline: 3px solid var(--live-ring);
+    outline-offset: 6px;
+    box-shadow: 0 28px 56px -24px rgba(0, 0, 0, 0.95);
     cursor: grabbing;
   }
   .tile.moving::before { filter: none; }
@@ -316,17 +329,20 @@
   /* ---- footer ---- */
   footer {
     display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 3vw;
-    min-height: 5.5vh;
+    align-items: center;
+    justify-content: center;
+    height: 4.4vh;
   }
   #note {
     font-size: clamp(13px, 1.05vw, 21px);
-    font-variation-settings: "wdth" 100, "wght" 400;
-    color: var(--haze);
-    max-width: 62ch;
-    line-height: 1.45;
+    font-variation-settings: "wdth" 100, "wght" 500;
+    color: var(--chalk);
+    opacity: 0.8;
+    line-height: 1.2;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   /* ---- screensaver ---- */
   #saver {
@@ -527,12 +543,20 @@
     tiles.forEach((t, i) => t.classList.toggle("moving", i === moving));
 
     const svc = services[cursor];
-    // The per-service note stays in services.json as catalog documentation but
-    // is not shown; on a TV it was reading as clutter. The footer is still used
-    // for the move-mode hint and for errors.
-    note.textContent = moving >= 0 && svc
-      ? "Moving " + svc.name + ". Arrows place it, Enter keeps it, Escape puts it back."
-      : "";
+    // The strip under the grid names whatever is focused. A logo is not always
+    // a name: the Plex triangle and the Fallout portrait say nothing to anyone
+    // who does not already know them, and labelling every tile would bury the
+    // logos it was meant to help. The per-service note stays in services.json
+    // as catalog documentation and is still not shown; on a TV it read as
+    // clutter.
+    if (moving >= 0 && svc) {
+      note.textContent =
+        "Moving " + svc.name + ". Arrows place it, Enter keeps it, Escape puts it back.";
+    } else if (cursor === GEAR) {
+      note.textContent = "Settings";
+    } else {
+      note.textContent = svc ? svc.name : "";
+    }
 
     // Keyboard focus has to drag the viewport with it, otherwise rows past the
     // fold are selectable but never visible. "nearest" scrolls the minimum
