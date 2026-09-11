@@ -138,17 +138,18 @@ cd ~/pilauncher
 
 `install.sh` installs the packages, writes the systemd user units, adds the
 compositor keybinds, installs the remote's key mapping, enables the health
-check and starts everything. It is safe to re-run, which is also how you apply
-changes after a `git pull`:
+check and starts everything. It is safe to re-run at any time, which matters
+later.
 
-```bash
-cd ~/pilauncher && git pull --ff-only && ./install.sh
-```
+It will warn that Waydroid is not installed. That is expected here and part
+two deals with it.
 
-Reboot and the launcher comes up on its own. Before trusting the streaming
+Reboot, and the launcher comes up on its own. Before trusting the streaming
 tiles, open <https://bitmovin.com/demos/drm> on the Pi and confirm the stream
-plays, which is what tells you Widevine is working. Then press the gear in
-the corner and start adding your own services.
+plays, which is what tells you Widevine is working.
+
+If you are carrying straight on to part two, you can skip this reboot. Step 3
+there reboots anyway and one is enough for both.
 
 ### Part two, Android
 
@@ -173,9 +174,19 @@ It is the fiddliest part of the build and the one worth doing. A remote
 driving a real Android TV app is a different experience from the same remote
 driving a web page that was written for one.
 
-Re-run `./install.sh` afterwards. It enables the Android session unit only
-once Waydroid is actually installed, so the unit stays inert on a box that has
-not got there yet rather than failing on every boot.
+Step 10 of those is re-running `./install.sh`, which is what actually connects
+Android to the launcher. That same command is how you apply any later change
+too:
+
+```bash
+cd ~/pilauncher && git pull --ff-only && ./install.sh
+```
+
+### Adding your own services
+
+Once it is up, press the gear in the corner. The settings page adds web pages
+by address and Android apps from a list of what Waydroid has installed, and
+fetches a logo and matching tile colors for either.
 
 ### Moving an existing setup to a new Pi
 
