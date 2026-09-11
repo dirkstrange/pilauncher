@@ -158,11 +158,16 @@ silently would be the wrong kind of helpful. Until it is done, Android tiles
 report `waydroid not found on PATH`.
 
 On a Pi 5 it means switching the boot kernel to 4K pages, enabling
-pressure-stall info, patching Waydroid's own network script so it stops
-reaching for an iptables backend Raspberry Pi OS does not ship, then
-`waydroid init -s GAPPS` and registering the device with Google. Every step
-and the reasoning behind it is under "Android apps through Waydroid" in
-[docs/TECHNICAL.md](docs/TECHNICAL.md).
+pressure-stall info, rebooting, patching Waydroid's own network script so it
+stops reaching for an iptables backend Raspberry Pi OS does not ship, then
+`waydroid init -s GAPPS`, registering the device with Google, and setting three
+properties that are not optional.
+
+**Eleven numbered steps, in the order they have to happen, are under "Android
+apps through Waydroid" in [docs/TECHNICAL.md](docs/TECHNICAL.md).** Two of them
+are boot changes that need a reboot before anything else works, and the last
+one wires Android into the launcher, so skipping ahead means going back. Each
+step says what to check before moving on.
 
 It is the fiddliest part of the build and the one worth doing. A remote
 driving a real Android TV app is a different experience from the same remote

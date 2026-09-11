@@ -711,96 +711,192 @@ both costs nothing and means the cable can move.
 
 ## Android apps through Waydroid
 
-**`install.sh` does not install Waydroid, and a launcher without it cannot open
-a single Android tile.** The script installs `chromium`, `libwidevinecdm0`,
-`curl` and `wlopm`, and that is the whole list. Everything below is a separate
-job you do once, before or after the launcher, and until you do it the web
-tiles work and the Android ones report `waydroid not found on PATH`.
+Part two of the build. The launcher is the frame; this is what fills half of
+it. Web players cover the services that will not ship an app or will not run
+one outside Google's certification, and everything else is better as an app.
 
-This was found the hard way: a from-scratch install from the README produced a
-box where seven of twenty-two tiles were dead, because the README advertised
-Android apps and never said how to get them.
+`install.sh` does not do this part. Waydroid needs two changes to how the Pi
+boots and a Google sign-in, and an installer that made those silently would be
+the wrong kind of helpful. Until it is done, Android tiles report
+`waydroid not found on PATH` and the web tiles carry on working.
 
-It is genuinely involved on a Pi 5. Three things have to be true before
-`waydroid init` will work, and one packaged file has to be patched.
+Do the steps in this order. Two of them are boot changes that need a reboot
+before anything else will work, and the last one wires Android into the
+launcher, so skipping ahead means going back.
 
-### The kernel has to use 4K pages
+### 1. Switch the boot kernel to 4K pages
 
-Android images are built for 4K pages and the Pi 5 boots `kernel_2712.img` at
-16K. Put `kernel=kernel8.img` at the top of `/boot/firmware/config.txt` to
-switch to the same kernel version built for 4K. Its module tree is complete,
-v3d and vc4 included, so the GPU, the display and Chromium are unaffected.
+Android images are built for 4K pages. The Pi 5 boots `kernel_2712.img` at 16K,
+and Waydroid's container will not run on it.
 
-This is boot-wide. The whole media centre runs on the 4K kernel for as long as
-Waydroid is installed.
+Add this as the first line of `/boot/firmware/config.txt`:
 
-### The kernel has to report pressure-stall info
+```
+kernel=kernel8.img
+```
 
-lxc wants PSI and the Pi kernel ships `CONFIG_PSI_DEFAULT_DISABLED=y`, so
-`psi=1` goes on the end of `/boot/firmware/cmdline.txt`, which is one long
-line. Without it `/proc/pressure/` does not exist and the container will not
-start.
+It is the same kernel version, built for 4K pages. The module tree is complete,
+v3d and vc4 included, so the GPU, the display and Chromium are unaffected. This
+is boot-wide: the whole media centre runs on the 4K kernel from now on.
 
-### Binder needs nothing
+### 2. Turn on pressure-stall info
 
-`CONFIG_ANDROID_BINDER_IPC=y` and `CONFIG_ANDROID_BINDERFS=y` are built into
-the Pi kernel, so the anbox-modules DKMS dance every older guide describes is
-obsolete. The container service mounts `/dev/binderfs` itself.
+lxc, which Waydroid uses for the container, wants PSI. The Pi kernel ships
+`CONFIG_PSI_DEFAULT_DISABLED=y`, so it has to be asked for. Add `psi=1` to the
+end of the single long line in `/boot/firmware/cmdline.txt`, space separated.
+Do not add a newline; that file is one line and the firmware reads only the
+first.
 
-### The network script has to be patched
+Nothing is needed for binder. `CONFIG_ANDROID_BINDER_IPC=y` and
+`CONFIG_ANDROID_BINDERFS=y` are built into the Pi kernel, so the anbox-modules
+DKMS dance that older guides describe is obsolete, and the container service
+mounts `/dev/binderfs` itself.
 
-This is the one that costs an evening.
+### 3. Reboot, and check both took
+
+```bash
+sudo reboot
+```
+
+Then:
+
+```bash
+getconf PAGESIZE     # must print 4096, not 16384
+ls /proc/pressure/   # must list cpu, io and memory
+```
+
+If `PAGESIZE` still reads 16384 the kernel line is not being read, and if
+`/proc/pressure/` does not exist then `psi=1` did not land. Fix those before
+going on, because the failure they cause later looks like a Waydroid bug.
+
+### 4. Install Waydroid
+
+```bash
+sudo apt install -y curl ca-certificates
+curl -s https://repo.waydro.id | sudo bash
+sudo apt install -y waydroid
+```
+
+This is Waydroid's own documented installer, which adds their apt repository
+and then installs from it. It is the one step here not reconstructed from a
+working build on this hardware, so if upstream has changed it, believe them
+over this file.
+
+### 5. Patch Waydroid's network script
+
+This is the step that costs an evening if you skip it, because the error it
+produces names nothing useful.
+
 `/usr/lib/waydroid/data/scripts/waydroid-net.sh` prefers `iptables-legacy` and
 gates its native nftables path behind a hardcoded `LXC_USE_NFT="false"`. No
 Raspberry Pi OS kernel ships `ip_tables.ko`, so every legacy call fails with
-"Table does not exist" and `waydroid session start` dies at the network step
+"Table does not exist", and `waydroid session start` dies at the network step
 showing only `Command failed: ... waydroid-net.sh start`.
 
 The plain `iptables` binary is already the nft backend and reaches filter, nat
-and mangle fine, so the fix is to drop the `-legacy` preference from that
-script. Keep a backup beside it.
+and mangle fine, so the fix is to stop the script preferring the legacy one:
+
+```bash
+sudo cp /usr/lib/waydroid/data/scripts/waydroid-net.sh \
+        /usr/lib/waydroid/data/scripts/waydroid-net.sh.bak
+sudo sed -i 's/iptables-legacy/iptables/g' \
+        /usr/lib/waydroid/data/scripts/waydroid-net.sh
+```
+
+Installing `nft` userspace and setting `LXC_USE_NFT` true is not an
+alternative on its own, because that userspace is not present either.
 
 **A Waydroid package upgrade silently reverts this and the session starts
-failing again.** If Android stops working after an update, look here first.
+failing again.** If Android stops working after an update, come back here
+first.
 
-### Then initialise it
+### 6. Initialise Android
 
-`waydroid init -s GAPPS` for the Play Store variant, which is what makes
-installed apps show up in the launcher's settings page ready to become tiles.
-Expect a large download. Device certification is a separate manual step on
-Google's uncertified-device page, using the `android_id` from the container.
+```bash
+sudo waydroid init -s GAPPS
+```
 
-Afterwards re-run `./install.sh`. It enables `waydroid-session.service` only
-when `waydroid` is on `PATH` and `/var/lib/waydroid/waydroid.cfg` exists, so
-the unit stays inert on a box without Android rather than failing every boot.
+GAPPS is the variant with the Play Store, which is what makes installed apps
+appear in the launcher's settings page ready to become tiles. Expect a large
+download. `-s VANILLA` works and leaves you sideloading every app by hand.
 
-### Settings that are not optional
+### 7. Start it once and let Android finish booting
 
-`persist.waydroid.multi_windows` must be **false**. Set true, apps become
-individual labwc toplevels over the tiles, which looks like the ideal
-integration and breaks two things: the window is sized by the app rather than
-the screen, and video does not composite. Playback genuinely runs while the
-picture is invisible, with the wallpaper showing through and the transport
-controls drawn on top. That is SurfaceView punch-hole: the app renders video to
-a hardware overlay and punches a transparent hole in its main surface, and
-multi-window mode never fills the hole. With it false everything composites
-through SurfaceFlinger into one fullscreen surface and video is correct.
+```bash
+sudo systemctl enable --now waydroid-container
+waydroid session start
+```
 
-`persist.waydroid.width` 1920 and `persist.waydroid.height` 1080, because
-Waydroid otherwise sizes its display to the area the taskbar leaves free and
-renders short at 1920x1044. Takes effect on session restart.
+First boot takes a few minutes. `waydroid status` should end at
+`Session: RUNNING`. `Container: FROZEN` afterwards is normal idle suspend, not
+a fault.
 
-A labwc window rule matching `identifier="waydroid.*"` with a
-`ToggleFullscreen` action, because the window Waydroid maps never requests
-fullscreen and the taskbar sits on top of it otherwise. `install.sh` adds this
-rule. Both this and the size settings are needed; either alone leaves it wrong.
+If it fails at the network step, go back to step 5.
 
-### What Android cannot do here
+### 8. Register the device with Google
 
-No Widevine. Waydroid ships none, so anything with DRM fails inside Android
-however well the app installs. Netflix quits itself. That is why the
-subscription services are Chromium tiles rather than Android apps, and it is
-not fixable from this end.
+Until you do, the Play Store reports the device as uncertified and most apps
+refuse to install.
+
+```bash
+sudo waydroid shell -- settings get secure android_id
+```
+
+Paste that id into <https://www.google.com/android/uncertified/> while signed
+in to the Google account you will use on the box, then give it a few minutes
+and restart the session.
+
+### 9. Set the three properties that are not optional
+
+```bash
+waydroid prop set persist.waydroid.multi_windows false
+waydroid prop set persist.waydroid.width 1920
+waydroid prop set persist.waydroid.height 1080
+```
+
+Run these as your normal user with the session running. Run as root they report
+"session is stopped", because the session belongs to your user. They take
+effect on the next session restart.
+
+`multi_windows` false is the one that matters most, and it is counterintuitive.
+Set true, apps become individual labwc windows floating over the tiles, which
+looks like the better integration and breaks two things: the window is sized by
+the app rather than the screen, and video does not composite. Playback genuinely
+runs while the picture is invisible, with the desktop wallpaper showing through
+and the transport controls drawn on top. That is SurfaceView punch-hole, where
+the app renders video to a hardware overlay and punches a transparent hole in
+its main surface, and multi-window mode never fills the hole. With it false
+everything composites through SurfaceFlinger into one fullscreen surface and
+video is correct.
+
+The width and height are there because Waydroid otherwise sizes its display to
+the area the taskbar leaves free and renders short, at 1920x1044 on a 1080
+screen.
+
+### 10. Wire it into the launcher
+
+```bash
+cd ~/pilauncher && ./install.sh
+```
+
+Re-running is how Android gets connected, and it is safe to do at any time.
+This run finds Waydroid installed and initialised, so it now enables
+`waydroid-session.service` to start Android at login, installs the root helper
+and the narrow sudoers rule that let the launcher stop an Android app, and adds
+the labwc window rule matching `identifier="waydroid.*"` that forces those
+windows fullscreen. Without that rule the taskbar sits on top of every Android
+app, because the window Waydroid maps never asks to be fullscreen and only
+Chromium's kiosk mode does.
+
+### 11. Reboot and check
+
+After the reboot, open Settings from the gear. "Installed Android apps" should
+list what Android has, each one press away from becoming a tile.
+
+Bear in mind there is no Widevine inside Android. Waydroid ships none, so
+anything with DRM fails however well the app installs, and Netflix quits
+itself. That is why the subscription services here are Chromium tiles and not
+Android apps, and it is not fixable from this end.
 
 ## When Android will not open anything
 
