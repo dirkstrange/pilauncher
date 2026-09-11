@@ -75,11 +75,10 @@
   {
     "id": "youtube",
     "name": "YouTube",
-    "kind": "android",
-    "package": "com.google.android.youtube.tv",
+    "url": "https://www.youtube.com/tv",
     "color": "#FF0033",
     "ink": "#0F0F0F",
-    "note": "Sideloaded Android TV app, not the web player. Real d-pad navigation. To go back to the web version, drop kind and package and set url to https://www.youtube.com/tv",
+    "note": "The web TV player, which works on a plain install. If you set Waydroid up, the sideloaded Android TV app has better d-pad navigation: set kind to android and package to com.google.android.youtube.tv, and drop the url.",
     "tile_bg": "#FFFFFF"
   },
   {
@@ -152,7 +151,8 @@
     "package": "com.android.vending",
     "color": "#01875F",
     "ink": "#FFFFFF",
-    "note": "Installs Android apps into Waydroid. Anything installed here turns up in Settings under installed Android apps, ready to add as a tile.",
+    "hidden": true,
+    "note": "Hidden by default because it cannot work until Waydroid is installed, and a tile that only ever reports an error is worse than no tile. Unhide it in Settings once Android is set up. Anything installed here turns up in Settings under installed Android apps, ready to add as a tile.",
     "tile_bg": "#07160F"
   }
 ]

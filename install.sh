@@ -300,7 +300,14 @@ if command -v waydroid >/dev/null 2>&1 && [ -f /var/lib/waydroid/waydroid.cfg ];
     sleep 3
   done
 else
-  say "Skipping the Android session (waydroid not installed or not initialised)"
+  # Deliberately a warning rather than a "say". This used to be an ordinary
+  # progress line and it scrolled past in a long install, which is how a
+  # from-scratch build got signed off with every Android tile dead. If the
+  # catalog has Android tiles, this is the reason none of them open.
+  warn "Waydroid is NOT installed, so no Android tile will open"
+  warn "  Web tiles are unaffected. If you do not want Android apps, ignore this."
+  warn "  To add them: docs/TECHNICAL.md, \"Android apps through Waydroid\","
+  warn "  then re-run this script to enable the session."
 fi
 
 say "Done"

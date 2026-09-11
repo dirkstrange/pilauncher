@@ -19,6 +19,9 @@ holding the OK button.
 Android apps work as well, through Waydroid. Anything installed from the Play
 Store appears in settings ready to become a tile, which is how YouTube and
 YouTube Music run here as real Android TV apps with proper remote navigation.
+That half is a separate install and a real evening's work on a Pi 5, covered
+in the technical notes; the launcher runs fine without it, with web tiles
+only.
 
 That route stops at anything with DRM. Waydroid ships no Widevine, so Netflix
 and the other subscription services run as web players in Chromium, which
@@ -139,6 +142,24 @@ Reboot and the launcher comes up on its own. Before trusting the streaming
 tiles, open <https://bitmovin.com/demos/drm> on the Pi and confirm the stream
 plays, which is what tells you Widevine is working. Then press the gear in
 the corner and start adding your own services.
+
+### Android apps are a separate job
+
+`install.sh` does not install Waydroid, and without it every Android tile
+reports `waydroid not found on PATH`. If you only want web players, you are
+done and can ignore this.
+
+If you want the Android half, do it before adding Android tiles. On a Pi 5 it
+means switching the boot kernel to 4K pages, enabling pressure-stall info,
+patching Waydroid's own network script so it stops reaching for an iptables
+backend Raspberry Pi OS does not ship, then `waydroid init -s GAPPS` and
+registering the device with Google. The steps and the reasoning are under
+"Android apps through Waydroid" in
+[docs/TECHNICAL.md](docs/TECHNICAL.md).
+
+Re-run `./install.sh` afterwards. It enables the Android session unit only
+once Waydroid is actually installed, so a box without it does not carry a unit
+that fails on every boot.
 
 ### Moving an existing setup to a new Pi
 
