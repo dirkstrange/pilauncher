@@ -59,3 +59,9 @@ Lineage/
 # base64, so committing one would publish exactly the trademarked artwork the
 # rest of this file exists to keep out. Named by prefix rather than by date.
 strange-media-backup-*.json
+
+# DJ's own folder for exports he wants to keep. The rule above already catches
+# anything still carrying the default filename; this catches the folder whatever
+# is put in it, because a renamed export is the obvious way past a name rule and
+# the contents are other people's artwork either way.
+backups/
