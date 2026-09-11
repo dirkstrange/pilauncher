@@ -140,6 +140,18 @@ tiles, open <https://bitmovin.com/demos/drm> on the Pi and confirm the stream
 plays, which is what tells you Widevine is working. Then press the gear in
 the corner and start adding your own services.
 
+### Moving an existing setup to a new Pi
+
+If you already have one running, you do not have to build the grid twice. On
+the old machine, Settings has "Save a backup", which hands you a single file
+holding every tile, its colors, its logo and the order they sit in. Copy that
+file onto the new Pi anywhere you can reach with a file picker, then after
+`install.sh` use "Restore from a backup".
+
+The one thing that does not travel is your logins, which live in the browser
+profiles rather than in the catalog. A restored box looks exactly like the old
+one and asks you to sign in once per service.
+
 ## Things worth knowing before you build one
 
 Netflix caps at about 720p here and Apple TV barely works. Both are decisions
