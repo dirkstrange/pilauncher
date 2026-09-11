@@ -60,6 +60,17 @@ mkdir -p ~/pilauncher
 chmod +x ~/pilauncher/launcher.py ~/pilauncher/back.sh
 ```
 
+The package is `chromium`, not `chromium-browser`. The older name still
+resolves in apt on Raspberry Pi OS, and installing it puts a stale Debian 12
+build on the machine alongside the current one. The launcher then starts
+whichever of the two comes first on `PATH`, which is not a fight worth having.
+
+If you edit this on Windows and deploy by `git pull`, note that Windows does
+not record the executable bit. A script committed from there arrives without
+it, and the Pi ends up with a local mode change that blocks the next pull.
+`git update-index --chmod=+x <script>` sets the bit in the index so the clone
+gets it right.
+
 ## Widevine and DRM
 
 Netflix, Prime Video, Max and the rest need Widevine to present a player at
@@ -627,6 +638,14 @@ being restarted while the page that knew about it is gone.
 `wlopm` powers down the output only. The compositor keeps running and keeps
 delivering input to the page underneath, which is what makes a dark screen
 safe: it is still a screen that reacts to the remote.
+
+One trap when testing this from a shell rather than from the sofa. Synthetic
+pointer motion, `wlrctl pointer move`, does NOT wake a blanked panel and does
+not reach the page's handlers once the output is down, although a real remote
+does. So a dark screen that ignores `wlrctl` is not evidence of anything.
+Worth knowing twice over, because `wlrctl pointer move` is also relative: a
+small move from a pointer already parked in a corner produces no event at all
+and looks exactly like a broken feature.
 
 ## What a boot with the TV off breaks
 
