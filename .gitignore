@@ -53,3 +53,9 @@ Lineage/
 *.apk
 *.apkm
 *.xapk
+
+# Catalog backups written by Settings. The image rules above do not catch these
+# because a backup is a .json, but every logo in the catalog is inside it as
+# base64, so committing one would publish exactly the trademarked artwork the
+# rest of this file exists to keep out. Named by prefix rather than by date.
+strange-media-backup-*.json
