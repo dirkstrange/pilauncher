@@ -16,12 +16,12 @@ can operate from a sofa: one Chromium kiosk window per service, each with its
 own profile and its own login, launched from a grid you can rearrange by
 holding the OK button.
 
-Android apps work as well, through Waydroid. Anything installed from the Play
-Store appears in settings ready to become a tile, which is how YouTube and
-YouTube Music run here as real Android TV apps with proper remote navigation.
-That half is a separate install and a real evening's work on a Pi 5, covered
-in the technical notes; the launcher runs fine without it, with web tiles
-only.
+The other half is Android, through Waydroid, and it is the half that makes
+this feel like a television rather than a browser. Anything installed from the
+Play Store appears in settings ready to become a tile, which is how YouTube
+and YouTube Music run here as real Android TV apps with d-pad navigation that
+was designed for a remote instead of tolerated by one. Web players are what
+you use where an app cannot go.
 
 That route stops at anything with DRM. Waydroid ships no Widevine, so Netflix
 and the other subscription services run as web players in Chromium, which
@@ -123,6 +123,13 @@ that any remote sending arrow keys and Enter will do, including most HDMI-CEC
 TV remotes and air mice. Bring your own accounts for the services, since this
 launches their players and provides no content of its own.
 
+There are two parts to the build and both are part of it. The launcher takes
+about five minutes. Android takes an evening, and it is where most of the
+character comes from, so leaving it out leaves you with something less than
+this project is.
+
+### Part one, the launcher
+
 ```bash
 git clone https://github.com/dirkstrange/pilauncher.git ~/pilauncher
 cd ~/pilauncher
@@ -143,23 +150,27 @@ tiles, open <https://bitmovin.com/demos/drm> on the Pi and confirm the stream
 plays, which is what tells you Widevine is working. Then press the gear in
 the corner and start adding your own services.
 
-### Android apps are a separate job
+### Part two, Android
 
-`install.sh` does not install Waydroid, and without it every Android tile
-reports `waydroid not found on PATH`. If you only want web players, you are
-done and can ignore this.
+`install.sh` cannot do this part for you. Waydroid needs decisions about your
+boot configuration and a Google sign-in, and an installer that made those
+silently would be the wrong kind of helpful. Until it is done, Android tiles
+report `waydroid not found on PATH`.
 
-If you want the Android half, do it before adding Android tiles. On a Pi 5 it
-means switching the boot kernel to 4K pages, enabling pressure-stall info,
-patching Waydroid's own network script so it stops reaching for an iptables
-backend Raspberry Pi OS does not ship, then `waydroid init -s GAPPS` and
-registering the device with Google. The steps and the reasoning are under
-"Android apps through Waydroid" in
+On a Pi 5 it means switching the boot kernel to 4K pages, enabling
+pressure-stall info, patching Waydroid's own network script so it stops
+reaching for an iptables backend Raspberry Pi OS does not ship, then
+`waydroid init -s GAPPS` and registering the device with Google. Every step
+and the reasoning behind it is under "Android apps through Waydroid" in
 [docs/TECHNICAL.md](docs/TECHNICAL.md).
 
+It is the fiddliest part of the build and the one worth doing. A remote
+driving a real Android TV app is a different experience from the same remote
+driving a web page that was written for one.
+
 Re-run `./install.sh` afterwards. It enables the Android session unit only
-once Waydroid is actually installed, so a box without it does not carry a unit
-that fails on every boot.
+once Waydroid is actually installed, so the unit stays inert on a box that has
+not got there yet rather than failing on every boot.
 
 ### Moving an existing setup to a new Pi
 

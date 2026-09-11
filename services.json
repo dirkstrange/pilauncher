@@ -78,7 +78,7 @@
     "url": "https://www.youtube.com/tv",
     "color": "#FF0033",
     "ink": "#0F0F0F",
-    "note": "The web TV player, which works on a plain install. If you set Waydroid up, the sideloaded Android TV app has better d-pad navigation: set kind to android and package to com.google.android.youtube.tv, and drop the url.",
+    "note": "The web TV player, which is the stand-in until part two of the build is done. Once Waydroid is up, move this to the Android TV app, which is the better experience: set kind to android and package to com.google.android.youtube.tv, and drop the url.",
     "tile_bg": "#FFFFFF"
   },
   {
@@ -152,7 +152,7 @@
     "color": "#01875F",
     "ink": "#FFFFFF",
     "hidden": true,
-    "note": "Hidden by default because it cannot work until Waydroid is installed, and a tile that only ever reports an error is worse than no tile. Unhide it in Settings once Android is set up. Anything installed here turns up in Settings under installed Android apps, ready to add as a tile.",
+    "note": "Hidden until part two of the build is done, because a tile that only ever reports an error is worse than no tile. Unhide it in Settings once Waydroid is up. Anything installed here turns up in Settings under installed Android apps, ready to add as a tile.",
     "tile_bg": "#07160F"
   }
 ]

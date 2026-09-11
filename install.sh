@@ -260,9 +260,12 @@ else
 fi
 
 # ------------------------------------------------------------------- waydroid
-# Android apps are optional. The unit file is written either way above, but it
-# is only enabled where waydroid is actually installed and initialised, so a
-# plain pilauncher box does not get a unit that fails on every boot.
+# Android is part two of the build rather than an extra, but it cannot be done
+# from here: it needs boot-configuration decisions and a Google sign-in, and an
+# installer making those silently would be the wrong kind of helpful. The unit
+# file is written either way above and only ENABLED once waydroid is actually
+# installed and initialised, so a box that has not got there yet carries an
+# inert unit rather than one that fails on every boot.
 if command -v waydroid >/dev/null 2>&1 && [ -f /var/lib/waydroid/waydroid.cfg ]; then
   say "Enabling the Android session"
 
@@ -304,10 +307,10 @@ else
   # progress line and it scrolled past in a long install, which is how a
   # from-scratch build got signed off with every Android tile dead. If the
   # catalog has Android tiles, this is the reason none of them open.
-  warn "Waydroid is NOT installed, so no Android tile will open"
-  warn "  Web tiles are unaffected. If you do not want Android apps, ignore this."
-  warn "  To add them: docs/TECHNICAL.md, \"Android apps through Waydroid\","
-  warn "  then re-run this script to enable the session."
+  warn "Waydroid is NOT installed. Part two of the build is not done yet, so"
+  warn "  no Android tile will open. The web tiles work in the meantime."
+  warn "  Steps: docs/TECHNICAL.md, \"Android apps through Waydroid\"."
+  warn "  Re-run this script afterwards to enable the Android session."
 fi
 
 say "Done"
